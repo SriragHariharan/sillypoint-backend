@@ -1,0 +1,30 @@
+{
+  "name": "sillypoint-backend",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [
+    "Cricket",
+    "scoring",
+    "tournaments"
+  ],
+  "homepage": "https://github.com/SriragHariharan/sillypoint-backend#readme",
+  "bugs": {
+    "url": "https://github.com/SriragHariharan/sillypoint-backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SriragHariharan/sillypoint-backend.git"
+  },
+  "license": "ISC",
+  "author": "Srirag H -- sriraghariharan108@gmail.com",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon app.js",
+    "serve": "node app.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
