@@ -1,13 +1,12 @@
 import "dotenv/config"
-import express, { type Request, type Response } from "express"
+import express from "express"
 import { sql } from "drizzle-orm"
 import { db } from "./db/postgres.js"
+import routes from "./routes/index.js"
 
 const app = express()
 
-app.get("/test", (_req: Request, res: Response) => {
-    res.json({message: "Hello world, sillypoint"})
-})
+app.use(routes)
 
 async function start() {
     await db.execute(sql`select 1`)
