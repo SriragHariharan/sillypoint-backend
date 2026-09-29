@@ -27,4 +27,10 @@ export const env = {
     refreshTokenSecret,
     clientOrigin: required("CLIENT_ORIGIN"),
     isProduction: process.env.NODE_ENV === "production",
+    // Optional at startup: only image uploads need them
+    cloudinary: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        apiSecret: process.env.CLOUDINARY_API_SECRET,
+    },
 }

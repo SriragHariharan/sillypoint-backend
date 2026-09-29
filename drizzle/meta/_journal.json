@@ -57,6 +57,13 @@
       "when": 1790681488567,
       "tag": "0007_secret_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790696961590,
+      "tag": "0008_smiling_sharon_carter",
+      "breakpoints": true
     }
   ]
 }

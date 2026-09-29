@@ -4,7 +4,7 @@ Cricket tournament management backend/API: tournaments, teams, fixture generatio
 
 ## Stack
 Express 5, TypeScript (ESM, NodeNext), Drizzle ORM + `postgres`, PostgreSQL. Env: `DATABASE_URL` (see `.env.example`).
-Installed standards: `zod` (validation), `argon2` (hashing OTPs), `jsonwebtoken` (JWT).
+Installed standards: `zod` (validation), `argon2` (hashing OTPs), `jsonwebtoken` (JWT), `multer` (multipart uploads, memory storage), `cloudinary` (image storage), `sanitize-html` (user HTML).
 Undecided (ask before adding): WebSocket library, test runner, logger. No Redis for MVP.
 
 ## Commands
@@ -33,6 +33,9 @@ Dependency direction: routes → controller → service → repository → db; s
 Mobile + OTP only: no passwords or PINs. Signup and login are the same flow: `POST /api/auth/request-otp` (new mobile -> `signup` OTP, verified user -> `login` OTP; same response `{ userId, purpose }` either way) -> `verify-otp` (a correct OTP means the user is logged in; `signup` also activates the user), with optional `resend-otp`. `otp` table purposes: `signup` / `login`. Hash OTPs; never log secrets (the OTP is only console-logged until MSG91 is added).
 OTP limits (constants in `auth.constants.ts`): 4 digits, 10-min expiry, 5 wrong guesses, 5 resends, then a 30-min block; the OTP row is locked (`FOR UPDATE`) while verifying/resending.
 Sessions: `verify-otp` returns a 15-min access JWT in the body (frontend keeps it in memory, sends `Authorization: Bearer`) and sets a 7-day refresh JWT as an HttpOnly, SameSite=Strict cookie (`Path=/api/auth`, `Secure` in production). Access and refresh tokens use different secrets (`ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, each 32+ chars, must differ; also `CLIENT_ORIGIN` for CORS). Refresh tokens rotate on every `POST /api/auth/refresh`, only their SHA-256 hash is stored (`refresh_tokens`), reuse of a rotated token ends the whole session family, and a session ends 30 days after login. `POST /api/auth/logout` revokes it. Protect routes with `authenticate` (`src/shared/middleware/authenticate.ts`, sets `res.locals.userId`); cookie endpoints also use `requireAllowedOrigin`. JWT helpers: `src/shared/utils/jwt.ts` (HS256 pinned, issuer + audience checked); env is validated in `src/shared/config/env.ts`. Frontend: `withCredentials` on `/api/auth/*`, never store the access token in localStorage, serialize refresh calls.
+
+## Tournaments
+`/api/tournaments` (`src/modules/tournaments/`): `POST /` (authenticated; multipart `name, description, location, startDate, endDate, logo?`), `POST /:id/cancel` (organizer only; POST because CORS allows only GET/POST), public `GET /` (filters `q, status, startFrom, startTo, organizerId`, paging `page, limit`) and public `GET /:id` (includes `organizer: { id, mobile }`). `tournaments.organizer_id` references `users.id` (restrict) and is always the logged-in user, never read from the body; only an active user can organize (`authService.getMe`). Only `cancelled_at` is stored; `status` (`upcoming | live | completed | cancelled`) is derived from the dates in `Asia/Kolkata` (`TOURNAMENT_TIMEZONE`). The description is HTML from the rich text editor and is sanitized to `DESCRIPTION_ALLOWED_TAGS` before saving. Logos go through `imageUpload` (`shared/middleware/upload.ts`, 2 MB, png/jpeg/webp) to Cloudinary (`shared/storage/cloudinary.ts`); `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` are read lazily, so the server starts without them and only logo uploads fail. `validate(schema, "params" | "query")` puts parsed values in `res.locals.params` / `res.locals.query`.
 
 ## Domain rules (from PRD)
 - Keep engines separate: Tournament/Fixture engine (who plays whom) → Match engine → Scoring engine → Live broadcast. No tournament logic in scoring.
