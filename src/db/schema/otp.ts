@@ -3,7 +3,7 @@ import { check, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } 
 
 import { users } from "./users.js"
 
-export const otpPurposeEnum = pgEnum("otp_purpose", ["signup", "password_reset"])
+export const otpPurposeEnum = pgEnum("otp_purpose", ["signup", "login"])
 
 export const otp = pgTable(
     "otp",

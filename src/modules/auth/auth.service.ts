@@ -1,11 +1,9 @@
 import { randomInt } from "node:crypto"
 import argon2 from "argon2"
 import { db } from "../../db/postgres.js"
-import { signToken } from "../../shared/utils/jwt.js"
-import { BadRequestError, ConflictError, ForbiddenError, TooManyRequestsError } from "../../shared/http/errors.js"
+import { BadRequestError, ForbiddenError, TooManyRequestsError } from "../../shared/http/errors.js"
 import {
     ACCOUNT_BLOCKED,
-    MOBILE_EXISTS,
     OTP_BLOCK_MS,
     OTP_EXPIRED,
     OTP_INVALID,
@@ -13,9 +11,6 @@ import {
     OTP_MAX_RESENDS,
     OTP_TTL_MS,
     RESEND_INVALID,
-    SET_PIN_NOT_ALLOWED,
-    SET_PIN_TOKEN_PURPOSE,
-    SET_PIN_TOKEN_TTL_SECONDS,
     TOO_MANY_ATTEMPTS,
 } from "./auth.constants.js"
 import { type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
@@ -28,16 +23,15 @@ import {
     insertOtp,
     insertUser,
     type OtpPurpose,
-    type Tx,
     replaceOtp,
-    setPinIfUnset,
+    type Tx,
     updateOtpFailure,
 } from "./auth.repository.js"
 
 // Random 4-digit code, like 0042
 const generateOtp = () => randomInt(0, 10000).toString().padStart(4, "0")
 
-// True if the database says the new user's mobile is already taken
+// True if the database says a new user has a mobile that is already taken
 const isDuplicateUser = (err: unknown) => {
     const cause = err instanceof Error ? (err.cause ?? err) : err
     return (
@@ -90,15 +84,14 @@ const reissueOtp = async (tx: Tx, row: OtpRow, otpHash: string, expiresAt: Date)
     return { resendsLeft: OTP_MAX_RESENDS - resendCount }
 }
 
-// Signup step 1: create the user and send an OTP. Returns the user id.
-export const signup = async (mobile: string) => {
+// Signup and login are the same step: send an OTP to the mobile.
+// A new mobile gets a signup OTP, a verified user gets a login OTP.
+export const requestOtp = async (mobile: string, isRetry = false): Promise<{ userId: number; purpose: OtpPurpose }> => {
     const existing = await findUserByMobile(mobile)
 
-    // Only unverified (inactive) users may retry signup; everyone else already has an account.
-    if (existing && existing.status !== "inactive") {
-        throw new ConflictError(MOBILE_EXISTS)
-    }
+    if (existing?.status === "blocked") throw new ForbiddenError(ACCOUNT_BLOCKED)
 
+    const purpose: OtpPurpose = existing?.status === "active" ? "login" : "signup"
     const code = generateOtp()
     // Store only the hash, never the plain OTP
     const otpHash = await argon2.hash(code)
@@ -112,29 +105,30 @@ export const signup = async (mobile: string) => {
             if (!existing) {
                 const created = await insertUser(tx, mobile)
                 if (!created) throw new Error("Failed to create user")
-                await insertOtp(tx, { userId: created.id, otpHash, purpose: "signup", expiresAt })
-                sendOtp(mobile, "signup", code)
+                await insertOtp(tx, { userId: created.id, otpHash, purpose, expiresAt })
+                sendOtp(mobile, purpose, code)
                 return { userId: created.id, blockedUntil: undefined }
             }
 
-            const row = await findOtpForUpdate(tx, existing.id, "signup")
+            const row = await findOtpForUpdate(tx, existing.id, purpose)
 
             if (!row) {
-                await insertOtp(tx, { userId: existing.id, otpHash, purpose: "signup", expiresAt })
-                sendOtp(mobile, "signup", code)
+                await insertOtp(tx, { userId: existing.id, otpHash, purpose, expiresAt })
+                sendOtp(mobile, purpose, code)
                 return { userId: existing.id, blockedUntil: undefined }
             }
 
-            // Signup again for an unverified mobile counts as a resend
+            // Asking again while an OTP exists counts as a resend
             const { blockedUntil } = await reissueOtp(tx, row, otpHash, expiresAt)
-            if (!blockedUntil) sendOtp(mobile, "signup", code)
+            if (!blockedUntil) sendOtp(mobile, purpose, code)
             return { userId: existing.id, blockedUntil }
         })
 
         if (result.blockedUntil) throw blockedError(result.blockedUntil)
-        return result.userId
+        return { userId: result.userId, purpose }
     } catch (err) {
-        if (isDuplicateUser(err)) throw new ConflictError(MOBILE_EXISTS)
+        // Two requests for a new mobile at once: the slower one retries as an existing user
+        if (!isRetry && isDuplicateUser(err)) return requestOtp(mobile, true)
         throw err
     }
 }
@@ -166,11 +160,12 @@ export const resendOtp = async ({ userId, purpose }: ResendOtpInput) => {
 }
 
 type WrongOtp = { attemptsLeft: number; blockedUntil: Date | null }
+type VerifyResult = { wrong: WrongOtp } | { user: { id: number; mobile: string } }
 
-// Signup step 2: check the OTP the user typed. Returns a short-lived set-PIN token after a signup OTP.
+// Check the OTP the user typed. A correct OTP means the user is logged in.
 export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
     // A wrong guess must be saved, so we return it and throw after the transaction commits
-    const wrong = await db.transaction(async (tx): Promise<WrongOtp | null> => {
+    const result = await db.transaction(async (tx): Promise<VerifyResult> => {
         const row = await findOtpForUpdate(tx, userId, purpose)
 
         // Same message for no user and no OTP, so ids cannot be probed
@@ -193,7 +188,7 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
             const attempts = row.attempts + 1
             const blockedUntil = attempts >= OTP_MAX_ATTEMPTS ? new Date(Date.now() + OTP_BLOCK_MS) : null
             await updateOtpFailure(tx, row.id, attempts, blockedUntil)
-            return { attemptsLeft: Math.max(0, OTP_MAX_ATTEMPTS - attempts), blockedUntil }
+            return { wrong: { attemptsLeft: Math.max(0, OTP_MAX_ATTEMPTS - attempts), blockedUntil } }
         }
 
         const user = await findUserById(tx, userId)
@@ -203,24 +198,16 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
         // OTP can be used only once
         await deleteOtpById(tx, row.id)
 
+        // First successful OTP verifies the mobile
         if (purpose === "signup") await activateUser(tx, userId)
 
-        return null
+        return { user: { id: user.id, mobile: user.mobile } }
     })
 
-    if (wrong?.blockedUntil) throw blockedError(wrong.blockedUntil)
-    if (wrong) throw new BadRequestError(`Invalid OTP. ${wrong.attemptsLeft} attempts left`)
+    if ("wrong" in result) {
+        if (result.wrong.blockedUntil) throw blockedError(result.wrong.blockedUntil)
+        throw new BadRequestError(`Invalid OTP. ${result.wrong.attemptsLeft} attempts left`)
+    }
 
-    // Password reset gets its own token flow later
-    if (purpose !== "signup") return undefined
-    return signToken(userId, SET_PIN_TOKEN_PURPOSE, SET_PIN_TOKEN_TTL_SECONDS)
-}
-
-// Signup step 3: save the PIN (hashed). It can be set only once.
-export const setPin = async (userId: number, pin: string) => {
-    const hashedPin = await argon2.hash(pin)
-    const savedId = await setPinIfUnset(userId, hashedPin)
-
-    // Not verified, blocked, or the PIN was already set
-    if (savedId === undefined) throw new ForbiddenError(SET_PIN_NOT_ALLOWED)
+    return { user: result.user, isNewUser: purpose === "signup" }
 }

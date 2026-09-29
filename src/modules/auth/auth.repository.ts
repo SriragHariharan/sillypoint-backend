@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "../../db/postgres.js"
 import { otp, otpPurposeEnum, users } from "../../db/schema/index.js"
 
@@ -68,14 +68,4 @@ export const updateOtpFailure = async (tx: Tx, id: number, attempts: number, blo
 // Delete an OTP row (used once it is verified)
 export const deleteOtpById = async (tx: Tx, id: number) => {
     await tx.delete(otp).where(eq(otp.id, id))
-}
-
-// Save the PIN hash only if the user is verified and has no PIN yet. Returns the user id, or undefined.
-export const setPinIfUnset = async (userId: number, hashedPin: string) => {
-    const [user] = await db
-        .update(users)
-        .set({ hashedPassword: hashedPin })
-        .where(and(eq(users.id, userId), eq(users.status, "active"), isNull(users.hashedPassword)))
-        .returning({ id: users.id })
-    return user?.id
 }

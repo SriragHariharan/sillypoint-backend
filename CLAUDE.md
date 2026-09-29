@@ -4,7 +4,7 @@ Cricket tournament management backend/API: tournaments, teams, fixture generatio
 
 ## Stack
 Express 5, TypeScript (ESM, NodeNext), Drizzle ORM + `postgres`, PostgreSQL. Env: `DATABASE_URL` (see `.env.example`).
-Standards for things not yet installed: `zod` (validation), `argon2` (password hashing), `jsonwebtoken` (JWT).
+Installed standards: `zod` (validation), `argon2` (hashing OTPs), `jsonwebtoken` (JWT).
 Undecided (ask before adding): WebSocket library, test runner, logger. No Redis for MVP.
 
 ## Commands
@@ -30,8 +30,9 @@ Dependency direction: routes → controller → service → repository → db; s
 - Tables: identity integer `id`, snake_case columns, `timestamp(..., { withTimezone: true })`.
 
 ## Auth
-Mobile + password, OTP verification (`otp` table: `signup` / `password_reset`), JWT sent as `Authorization: Bearer`. Hash passwords and OTPs; never log secrets.
-Signup flow: `signup` → `verify-otp` (returns a 10-min, purpose `set_pin` JWT in the body) → `set-pin` (`Authorization: Bearer`, PIN + confirm_pin, 4 digits via `PIN_LENGTH`). PIN is argon2-hashed into `users.hashed_password` and can be set only once. JWT helpers live in `src/shared/utils/jwt.ts` (HS256 pinned, secret from `JWT_SECRET` env, min 32 chars); every token carries a `purpose` claim that its endpoint must check.
+Mobile + OTP only: no passwords or PINs. Signup and login are the same flow: `POST /api/auth/request-otp` (new mobile -> `signup` OTP, verified user -> `login` OTP; same response `{ userId, purpose }` either way) -> `verify-otp` (a correct OTP means the user is logged in; `signup` also activates the user), with optional `resend-otp`. `otp` table purposes: `signup` / `login`. Hash OTPs; never log secrets (the OTP is only console-logged until MSG91 is added).
+OTP limits (constants in `auth.constants.ts`): 4 digits, 10-min expiry, 5 wrong guesses, 5 resends, then a 30-min block; the OTP row is locked (`FOR UPDATE`) while verifying/resending.
+Session tokens (access/refresh) are not built yet. JWT helper: `src/shared/utils/jwt.ts` (HS256 pinned, secret from `JWT_SECRET` env, min 32 chars); every token carries a `purpose` claim that its endpoint must check; sent as `Authorization: Bearer`.
 
 ## Domain rules (from PRD)
 - Keep engines separate: Tournament/Fixture engine (who plays whom) → Match engine → Scoring engine → Live broadcast. No tournament logic in scoring.

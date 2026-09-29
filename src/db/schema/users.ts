@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { check, integer, pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core"
+import { check, integer, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core"
 
 export const userStatusEnum = pgEnum("user_status", ["active", "inactive", "blocked"])
 
@@ -8,7 +8,6 @@ export const users = pgTable(
     {
         id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
         mobile: varchar("mobile", { length: 10 }).notNull().unique(),
-        hashedPassword: text("hashed_password"),
         status: userStatusEnum("status").notNull().default("inactive"),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true })
