@@ -14,10 +14,10 @@ Undecided (ask before adding): WebSocket library, test runner, logger. No Redis 
 
 ## Layout
 Feature modules + pure engines (adopt as each feature starts; don't scaffold empty folders):
-- `src/modules/<feature>/` — `*.routes.ts` → `*.controller.ts` → `*.service.ts` → `*.repository.ts` (+ `*.schema.ts` zod). Features: auth, tournaments, teams, fixtures, matches, scoring, stats, announcements, public.
+- `src/modules/<feature>/` — `*.routes.ts` → `*.controller.ts` → `*.service.ts` → `*.repository.ts` (+ `*.schema.ts` zod, `*.constants.ts`). Features: auth, tournaments, teams, fixtures, matches, scoring, stats, announcements, public.
 - `src/engines/` — pure TS (fixtures, scoring, standings, stats). No imports from express, db or modules.
 - `src/realtime/` — WebSocket server and match hub.
-- `src/shared/` — `http/response.ts` (`success`, `failure`), middleware (authenticate, authorize, validate, error-handler), utils (shuffle).
+- `src/shared/` — `http/response.ts` (`success`, `failure`), middleware (authenticate, authorize, validate, error-handler), utils (shuffle), `constants/` (constants used by more than one module).
 - `src/db/` — `schema/*` re-exported from `schema/index.ts`. `src/routes.ts` mounts module routers under `/api`.
 Dependency direction: routes → controller → service → repository → db; service → engines. See `add-endpoint` skill.
 (Current code still uses `src/routes` + `src/handlers` + `src/helpers`; migrate when Sprint 1 starts.)
@@ -26,6 +26,7 @@ Dependency direction: routes → controller → service → repository → db; s
 - Relative imports end in `.js`; use `import { type X }` for types.
 - 4-space indent, double quotes, no semicolons.
 - `strict` + `noUncheckedIndexedAccess` are on; no `any`.
+- Constants (magic numbers, TTLs, fixed messages, limits) never live in service/controller/repository/routes files. Put them in `src/modules/<feature>/<feature>.constants.ts` (UPPER_SNAKE_CASE, exported); if used by 2+ modules, put them in `src/shared/constants/`. Import them with the `.js` suffix.
 - Tables: identity integer `id`, snake_case columns, `timestamp(..., { withTimezone: true })`.
 
 ## Auth

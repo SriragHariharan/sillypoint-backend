@@ -12,5 +12,6 @@ Work inside `src/modules/<feature>/` (create the module if it doesn't exist). If
 3. **Service** (`<feature>.service.ts`): business rules, authz-relevant state checks, transactions. Call `src/engines/*` for cricket logic; call other modules via their service, never their repository.
 4. **Controller** (`<feature>.controller.ts`): `(req: Request, res: Response)`; respond only via `success` / `failure` from `shared/http/response.js`. Express 5 forwards async errors.
 5. **Routes** (`<feature>.routes.ts`): `Router()`, attach middleware (`authenticate`, then `authorize` for tournament owner / team owner / match scorer as needed), `export default router`; mount in `src/routes.ts` under `/api`. Public spectator routes go in `modules/public` with no auth.
-6. Imports use the `.js` suffix; 4-space indent, double quotes, no semicolons.
-7. Verify: `npm run build` passes; hit the endpoint with `npm run dev` when practical.
+6. **Constants**: never declare constants (TTLs, limits, fixed messages) in the files above. Add them to `<feature>.constants.ts` (or `src/shared/constants/` if shared across modules) and import them.
+7. Imports use the `.js` suffix; 4-space indent, double quotes, no semicolons.
+8. Verify: `npm run build` passes; hit the endpoint with `npm run dev` when practical.

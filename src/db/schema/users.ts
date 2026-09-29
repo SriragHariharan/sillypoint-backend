@@ -8,8 +8,8 @@ export const users = pgTable(
     {
         id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
         mobile: varchar("mobile", { length: 10 }).notNull().unique(),
-        hashedPassword: text("hashed_password").notNull(),
-        status: userStatusEnum("status").notNull().default("active"),
+        hashedPassword: text("hashed_password"),
+        status: userStatusEnum("status").notNull().default("inactive"),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true })
             .notNull()
