@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto"
 import argon2 from "argon2"
 import { db } from "../../db/postgres.js"
+import { signToken } from "../../shared/utils/jwt.js"
 import { BadRequestError, ConflictError, ForbiddenError, TooManyRequestsError } from "../../shared/http/errors.js"
 import {
     ACCOUNT_BLOCKED,
@@ -12,6 +13,9 @@ import {
     OTP_MAX_RESENDS,
     OTP_TTL_MS,
     RESEND_INVALID,
+    SET_PIN_NOT_ALLOWED,
+    SET_PIN_TOKEN_PURPOSE,
+    SET_PIN_TOKEN_TTL_SECONDS,
     TOO_MANY_ATTEMPTS,
 } from "./auth.constants.js"
 import { type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
@@ -26,6 +30,7 @@ import {
     type OtpPurpose,
     type Tx,
     replaceOtp,
+    setPinIfUnset,
     updateOtpFailure,
 } from "./auth.repository.js"
 
@@ -162,7 +167,7 @@ export const resendOtp = async ({ userId, purpose }: ResendOtpInput) => {
 
 type WrongOtp = { attemptsLeft: number; blockedUntil: Date | null }
 
-// Signup step 2: check the OTP the user typed
+// Signup step 2: check the OTP the user typed. Returns a short-lived set-PIN token after a signup OTP.
 export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
     // A wrong guess must be saved, so we return it and throw after the transaction commits
     const wrong = await db.transaction(async (tx): Promise<WrongOtp | null> => {
@@ -205,4 +210,17 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
 
     if (wrong?.blockedUntil) throw blockedError(wrong.blockedUntil)
     if (wrong) throw new BadRequestError(`Invalid OTP. ${wrong.attemptsLeft} attempts left`)
+
+    // Password reset gets its own token flow later
+    if (purpose !== "signup") return undefined
+    return signToken(userId, SET_PIN_TOKEN_PURPOSE, SET_PIN_TOKEN_TTL_SECONDS)
+}
+
+// Signup step 3: save the PIN (hashed). It can be set only once.
+export const setPin = async (userId: number, pin: string) => {
+    const hashedPin = await argon2.hash(pin)
+    const savedId = await setPinIfUnset(userId, hashedPin)
+
+    // Not verified, blocked, or the PIN was already set
+    if (savedId === undefined) throw new ForbiddenError(SET_PIN_NOT_ALLOWED)
 }

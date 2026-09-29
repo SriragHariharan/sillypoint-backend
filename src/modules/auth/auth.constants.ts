@@ -17,3 +17,15 @@ export const OTP_MAX_RESENDS = 5
 
 export const RESEND_INVALID = "Cannot resend OTP"
 export const TOO_MANY_ATTEMPTS = "Too many attempts. Try again in"
+
+// PIN must be exactly this many digits
+export const PIN_LENGTH = 4
+
+// The token given after OTP verification is valid for 10 minutes
+export const SET_PIN_TOKEN_TTL_SECONDS = 10 * 60
+export const SET_PIN_TOKEN_PURPOSE = "set_pin"
+
+export const PIN_MISMATCH = "PIN and confirm PIN do not match"
+export const SET_PIN_UNAUTHORIZED = "Missing or invalid token"
+export const SET_PIN_EXPIRED = "Session expired, please verify your OTP again"
+export const SET_PIN_NOT_ALLOWED = "Cannot set PIN"

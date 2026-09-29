@@ -31,6 +31,7 @@ Dependency direction: routes → controller → service → repository → db; s
 
 ## Auth
 Mobile + password, OTP verification (`otp` table: `signup` / `password_reset`), JWT sent as `Authorization: Bearer`. Hash passwords and OTPs; never log secrets.
+Signup flow: `signup` → `verify-otp` (returns a 10-min, purpose `set_pin` JWT in the body) → `set-pin` (`Authorization: Bearer`, PIN + confirm_pin, 4 digits via `PIN_LENGTH`). PIN is argon2-hashed into `users.hashed_password` and can be set only once. JWT helpers live in `src/shared/utils/jwt.ts` (HS256 pinned, secret from `JWT_SECRET` env, min 32 chars); every token carries a `purpose` claim that its endpoint must check.
 
 ## Domain rules (from PRD)
 - Keep engines separate: Tournament/Fixture engine (who plays whom) → Match engine → Scoring engine → Live broadcast. No tournament logic in scoring.
