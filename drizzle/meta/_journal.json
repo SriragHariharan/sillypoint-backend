@@ -36,6 +36,13 @@
       "when": 1790678028997,
       "tag": "0004_lyrical_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790678512955,
+      "tag": "0005_wandering_enchantress",
+      "breakpoints": true
     }
   ]
 }

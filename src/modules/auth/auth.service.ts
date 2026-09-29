@@ -9,9 +9,12 @@ import {
     OTP_EXPIRED,
     OTP_INVALID,
     OTP_MAX_ATTEMPTS,
+    OTP_MAX_RESENDS,
     OTP_TTL_MS,
+    RESEND_INVALID,
+    TOO_MANY_ATTEMPTS,
 } from "./auth.constants.js"
-import { type VerifyOtpInput } from "./auth.schema.js"
+import { type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
 import {
     activateUser,
     deleteOtpById,
@@ -20,6 +23,8 @@ import {
     findUserByMobile,
     insertOtp,
     insertUser,
+    type OtpPurpose,
+    type Tx,
     replaceOtp,
     updateOtpFailure,
 } from "./auth.repository.js"
@@ -43,7 +48,41 @@ const isDuplicateUser = (err: unknown) => {
 // Error for a user who is still blocked
 const blockedError = (until: Date) => {
     const minutes = Math.max(1, Math.ceil((until.getTime() - Date.now()) / 60000))
-    return new TooManyRequestsError(`Too many wrong attempts. Try again in ${minutes} minutes`)
+    return new TooManyRequestsError(`${TOO_MANY_ATTEMPTS} ${minutes} minutes`)
+}
+
+// Send the OTP to the user. TODO: replace with MSG91 SMS delivery.
+const sendOtp = (mobile: string, purpose: OtpPurpose, code: string) => {
+    console.log(`OTP (${purpose}) for ${mobile}: ${code}`)
+}
+
+type OtpRow = NonNullable<Awaited<ReturnType<typeof findOtpForUpdate>>>
+
+// Rules for giving a new OTP to a user who already has an OTP row.
+// Returns the block end time if the user is blocked (no OTP is issued), else the resends left.
+const reissueOtp = async (tx: Tx, row: OtpRow, otpHash: string, expiresAt: Date) => {
+    const now = new Date()
+
+    // Still blocked: no new OTP
+    if (row.blockedUntil && row.blockedUntil > now) return { blockedUntil: row.blockedUntil }
+
+    // Block is over: start fresh
+    if (row.blockedUntil) {
+        await replaceOtp(tx, row.id, { otpHash, expiresAt, attempts: 0, resendCount: 0 })
+        return { resendsLeft: OTP_MAX_RESENDS }
+    }
+
+    // Resend limit reached: block the user (saved, the caller throws after the transaction)
+    if (row.resendCount >= OTP_MAX_RESENDS) {
+        const blockedUntil = new Date(Date.now() + OTP_BLOCK_MS)
+        await updateOtpFailure(tx, row.id, row.attempts, blockedUntil)
+        return { blockedUntil }
+    }
+
+    // Resend: new code, keep the wrong-attempt count so the limit cannot be reset
+    const resendCount = row.resendCount + 1
+    await replaceOtp(tx, row.id, { otpHash, expiresAt, resendCount })
+    return { resendsLeft: OTP_MAX_RESENDS - resendCount }
 }
 
 // Signup step 1: create the user and send an OTP. Returns the user id.
@@ -59,11 +98,9 @@ export const signup = async (mobile: string) => {
     // Store only the hash, never the plain OTP
     const otpHash = await argon2.hash(code)
 
-    let userId: number
-
     try {
         // User and OTP are saved together, or not at all
-        userId = await db.transaction(async (tx) => {
+        const result = await db.transaction(async (tx) => {
             const expiresAt = new Date(Date.now() + OTP_TTL_MS)
 
             // New mobile: create the user and the first OTP
@@ -71,35 +108,56 @@ export const signup = async (mobile: string) => {
                 const created = await insertUser(tx, mobile)
                 if (!created) throw new Error("Failed to create user")
                 await insertOtp(tx, { userId: created.id, otpHash, purpose: "signup", expiresAt })
-                return created.id
+                sendOtp(mobile, "signup", code)
+                return { userId: created.id, blockedUntil: undefined }
             }
 
             const row = await findOtpForUpdate(tx, existing.id, "signup")
 
             if (!row) {
                 await insertOtp(tx, { userId: existing.id, otpHash, purpose: "signup", expiresAt })
-            } else if (row.blockedUntil && row.blockedUntil > new Date()) {
-                // Still blocked: no new OTP
-                throw blockedError(row.blockedUntil)
-            } else if (row.blockedUntil) {
-                // Block is over: start fresh
-                await replaceOtp(tx, row.id, { otpHash, expiresAt, attempts: 0 })
-            } else {
-                // Resend: new code, but keep the wrong-attempt count so the limit cannot be reset
-                await replaceOtp(tx, row.id, { otpHash, expiresAt })
+                sendOtp(mobile, "signup", code)
+                return { userId: existing.id, blockedUntil: undefined }
             }
 
-            return existing.id
+            // Signup again for an unverified mobile counts as a resend
+            const { blockedUntil } = await reissueOtp(tx, row, otpHash, expiresAt)
+            if (!blockedUntil) sendOtp(mobile, "signup", code)
+            return { userId: existing.id, blockedUntil }
         })
+
+        if (result.blockedUntil) throw blockedError(result.blockedUntil)
+        return result.userId
     } catch (err) {
         if (isDuplicateUser(err)) throw new ConflictError(MOBILE_EXISTS)
         throw err
     }
+}
 
-    // TODO: replace with MSG91 SMS delivery.
-    console.log(`Signup OTP for ${mobile}: ${code}`)
+// Send a new OTP to a user who asked for one. Returns how many resends are left.
+export const resendOtp = async ({ userId, purpose }: ResendOtpInput) => {
+    const code = generateOtp()
+    const otpHash = await argon2.hash(code)
 
-    return userId
+    const result = await db.transaction(async (tx) => {
+        const user = await findUserById(tx, userId)
+        if (!user) throw new BadRequestError(RESEND_INVALID)
+        if (user.status === "blocked") throw new ForbiddenError(ACCOUNT_BLOCKED)
+
+        // Lock the row so parallel resend taps cannot pass the limit
+        const row = await findOtpForUpdate(tx, userId, purpose)
+        if (!row) throw new BadRequestError(RESEND_INVALID)
+
+        const expiresAt = new Date(Date.now() + OTP_TTL_MS)
+        const outcome = await reissueOtp(tx, row, otpHash, expiresAt)
+
+        // Send last, so a failed send will undo the resend count
+        if (!outcome.blockedUntil) sendOtp(user.mobile, purpose, code)
+        return outcome
+    })
+
+    if (result.blockedUntil) throw blockedError(result.blockedUntil)
+    return result.resendsLeft
 }
 
 type WrongOtp = { attemptsLeft: number; blockedUntil: Date | null }

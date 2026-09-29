@@ -48,11 +48,11 @@ export const insertOtp = async (
     await tx.insert(otp).values(values)
 }
 
-// Put a new OTP in an existing row; attempts is kept unless a new value is given
+// Put a new OTP in an existing row; attempts and resendCount are kept unless a new value is given
 export const replaceOtp = async (
     tx: Tx,
     id: number,
-    values: { otpHash: string; expiresAt: Date; attempts?: number },
+    values: { otpHash: string; expiresAt: Date; attempts?: number; resendCount?: number },
 ) => {
     await tx
         .update(otp)

@@ -11,3 +11,9 @@ export const MOBILE_EXISTS = "Mobile already exists"
 export const OTP_INVALID = "Invalid or expired OTP"
 export const OTP_EXPIRED = "OTP expired, please request a new one"
 export const ACCOUNT_BLOCKED = "Account is blocked"
+
+// Resends allowed before the user is blocked
+export const OTP_MAX_RESENDS = 5
+
+export const RESEND_INVALID = "Cannot resend OTP"
+export const TOO_MANY_ATTEMPTS = "Too many attempts. Try again in"

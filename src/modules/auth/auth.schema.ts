@@ -13,5 +13,12 @@ export const verifyOtpSchema = z.object({
     purpose: z.enum(otpPurposeEnum.enumValues, { error: "Invalid purpose" }),
 })
 
+// Resend body: user id and what the OTP is for
+export const resendOtpSchema = z.object({
+    userId: z.number({ error: "User id is required" }).int().positive(),
+    purpose: z.enum(otpPurposeEnum.enumValues, { error: "Invalid purpose" }),
+})
+
 export type SignupInput = z.infer<typeof signupSchema>
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>
+export type ResendOtpInput = z.infer<typeof resendOtpSchema>
