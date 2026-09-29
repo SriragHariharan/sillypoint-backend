@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto"
 import argon2 from "argon2"
 import { db } from "../../db/postgres.js"
-import { BadRequestError, ForbiddenError, TooManyRequestsError } from "../../shared/http/errors.js"
+import { BadRequestError, ForbiddenError, TooManyRequestsError, UnauthorizedError } from "../../shared/http/errors.js"
 import {
     ACCOUNT_BLOCKED,
     OTP_BLOCK_MS,
@@ -20,6 +20,7 @@ import {
     findOtpForUpdate,
     findUserById,
     findUserByMobile,
+    getUserById,
     insertOtp,
     insertUser,
     type OtpPurpose,
@@ -27,6 +28,7 @@ import {
     type Tx,
     updateOtpFailure,
 } from "./auth.repository.js"
+import { issueSession } from "./session.service.js"
 
 // Random 4-digit code, like 0042
 const generateOtp = () => randomInt(0, 10000).toString().padStart(4, "0")
@@ -162,7 +164,7 @@ export const resendOtp = async ({ userId, purpose }: ResendOtpInput) => {
 type WrongOtp = { attemptsLeft: number; blockedUntil: Date | null }
 type VerifyResult = { wrong: WrongOtp } | { user: { id: number; mobile: string } }
 
-// Check the OTP the user typed. A correct OTP means the user is logged in.
+// Check the OTP the user typed. A correct OTP logs the user in and starts a session.
 export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
     // A wrong guess must be saved, so we return it and throw after the transaction commits
     const result = await db.transaction(async (tx): Promise<VerifyResult> => {
@@ -209,5 +211,15 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
         throw new BadRequestError(`Invalid OTP. ${result.wrong.attemptsLeft} attempts left`)
     }
 
-    return { user: result.user, isNewUser: purpose === "signup" }
+    const session = await issueSession(result.user.id)
+
+    return { user: result.user, isNewUser: purpose === "signup", session }
+}
+
+// Get the logged in user. A blocked or deleted user is treated as logged out.
+export const getMe = async (userId: number) => {
+    const user = await getUserById(userId)
+    if (!user || user.status !== "active") throw new UnauthorizedError("Unauthorized")
+
+    return { id: user.id, mobile: user.mobile }
 }

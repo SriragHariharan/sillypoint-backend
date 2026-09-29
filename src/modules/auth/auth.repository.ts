@@ -69,3 +69,9 @@ export const updateOtpFailure = async (tx: Tx, id: number, attempts: number, blo
 export const deleteOtpById = async (tx: Tx, id: number) => {
     await tx.delete(otp).where(eq(otp.id, id))
 }
+
+// Find a user by id (outside a transaction)
+export const getUserById = async (userId: number) => {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+    return user
+}

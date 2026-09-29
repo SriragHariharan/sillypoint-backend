@@ -50,6 +50,13 @@
       "when": 1790680683330,
       "tag": "0006_natural_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790681488567,
+      "tag": "0007_secret_vengeance",
+      "breakpoints": true
     }
   ]
 }
