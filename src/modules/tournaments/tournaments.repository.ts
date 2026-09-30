@@ -81,7 +81,7 @@ export const findTournamentDetails = async (id: number) => {
         .select({
             ...summaryColumns,
             description: tournaments.description,
-            organizer: { id: users.id, mobile: users.mobile },
+            organizer: { id: users.id, mobile: users.mobile, avatar: users.avatarUrl },
         })
         .from(tournaments)
         .innerJoin(users, eq(users.id, tournaments.organizerId))

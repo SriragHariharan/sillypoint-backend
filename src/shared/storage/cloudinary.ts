@@ -17,13 +17,25 @@ const configure = () => {
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true })
 }
 
+type UploadOptions = { square?: number }
+
 // Upload an image from memory. Cloudinary itself rejects files that are not real png/jpg/webp images.
-export const uploadImage = async (buffer: Buffer, folder: string): Promise<UploadedImage> => {
+// With `square`, the stored image is cropped to that size around the main subject (used for profile photos).
+export const uploadImage = async (
+    buffer: Buffer,
+    folder: string,
+    { square }: UploadOptions = {},
+): Promise<UploadedImage> => {
     configure()
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder, resource_type: "image", allowed_formats: IMAGE_FORMATS },
+            {
+                folder,
+                resource_type: "image",
+                allowed_formats: IMAGE_FORMATS,
+                ...(square && { transformation: [{ width: square, height: square, crop: "fill", gravity: "auto" }] }),
+            },
             (error, result) => {
                 if (result) return resolve({ url: result.secure_url, publicId: result.public_id })
                 // A file Cloudinary refuses is the user's mistake; anything else is ours
@@ -35,12 +47,15 @@ export const uploadImage = async (buffer: Buffer, folder: string): Promise<Uploa
     })
 }
 
-// Best effort: a failed cleanup must never break the request
+// Delete an image. Returns false instead of throwing, so the caller decides how much a failure matters.
+// An image that is already gone counts as deleted.
 export const deleteImage = async (publicId: string) => {
     try {
         configure()
-        await cloudinary.uploader.destroy(publicId)
+        const { result } = await cloudinary.uploader.destroy(publicId, { invalidate: true })
+        return result === "ok" || result === "not found"
     } catch (err) {
-        console.error("Image cleanup failed:", err instanceof Error ? err.message : "unknown")
+        console.error("Image delete failed:", err instanceof Error ? err.message : "unknown")
+        return false
     }
 }

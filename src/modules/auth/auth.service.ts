@@ -162,7 +162,7 @@ export const resendOtp = async ({ userId, purpose }: ResendOtpInput) => {
 }
 
 type WrongOtp = { attemptsLeft: number; blockedUntil: Date | null }
-type VerifyResult = { wrong: WrongOtp } | { user: { id: number; mobile: string } }
+type VerifyResult = { wrong: WrongOtp } | { user: { id: number; mobile: string; avatar: string | null } }
 
 // Check the OTP the user typed. A correct OTP logs the user in and starts a session.
 export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
@@ -203,7 +203,7 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
         // First successful OTP verifies the mobile
         if (purpose === "signup") await activateUser(tx, userId)
 
-        return { user: { id: user.id, mobile: user.mobile } }
+        return { user: { id: user.id, mobile: user.mobile, avatar: user.avatarUrl } }
     })
 
     if ("wrong" in result) {
@@ -221,5 +221,5 @@ export const getMe = async (userId: number) => {
     const user = await getUserById(userId)
     if (!user || user.status !== "active") throw new UnauthorizedError("Unauthorized")
 
-    return { id: user.id, mobile: user.mobile }
+    return { id: user.id, mobile: user.mobile, avatar: user.avatarUrl }
 }
