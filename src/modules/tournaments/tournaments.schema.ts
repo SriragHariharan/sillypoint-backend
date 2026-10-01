@@ -5,6 +5,7 @@ import {
     LIST_DEFAULT_LIMIT,
     LIST_MAX_LIMIT,
     LOCATION_MAX_LENGTH,
+    MAX_AMOUNT,
     MAX_TEAMS_PER_REQUEST,
     NAME_MAX_LENGTH,
     NAME_MIN_LENGTH,
@@ -18,6 +19,15 @@ const isoDate = (label: string) =>
         .string({ error: `${label} is required` })
         .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must be YYYY-MM-DD`)
         .refine(isRealDate, `${label} is not a valid date`)
+
+// A whole rupee amount sent as form text, like "500"
+const amountText = (label: string) =>
+    z
+        .string({ error: `${label} is required` })
+        .trim()
+        .regex(/^\d+$/, `${label} must be a whole number`)
+        .transform(Number)
+        .refine((value) => value <= MAX_AMOUNT, `${label} must be at most ${MAX_AMOUNT}`)
 
 // The date rules shared by create and reschedule
 const withDateRules = <T extends z.ZodType<{ startDate: string; endDate: string }>>(schema: T) =>
@@ -50,6 +60,8 @@ export const createTournamentSchema = withDateRules(
             .max(LOCATION_MAX_LENGTH, `Location must be at most ${LOCATION_MAX_LENGTH} characters`),
         startDate: isoDate("Start date"),
         endDate: isoDate("End date"),
+        registrationFee: amountText("Registration fee"),
+        prizeMoney: amountText("Prize money"),
     }),
 )
 
@@ -63,6 +75,17 @@ export const rescheduleTournamentSchema = withDateRules(
 export const tournamentIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid tournament id" }).int().positive("Invalid tournament id"),
 })
+
+// Only the prize money can change after creation. strict() rejects any other key, including registrationFee.
+export const updateTournamentSchema = z
+    .object({
+        prizeMoney: z
+            .number({ error: "Prize money must be a whole number" })
+            .int("Prize money must be a whole number")
+            .min(0, "Prize money cannot be negative")
+            .max(MAX_AMOUNT, `Prize money must be at most ${MAX_AMOUNT}`),
+    })
+    .strict()
 
 export const enrolledTeamParamsSchema = tournamentIdParamsSchema.extend({
     teamId: z.coerce.number({ error: "Invalid team id" }).int().positive("Invalid team id"),
@@ -106,6 +129,7 @@ export const listTournamentsQuerySchema = z
 
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>
 export type RescheduleTournamentInput = z.infer<typeof rescheduleTournamentSchema>
+export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>
 export type TournamentIdParams = z.infer<typeof tournamentIdParamsSchema>
 export type EnrolledTeamParams = z.infer<typeof enrolledTeamParamsSchema>
 export type AddTeamsInput = z.infer<typeof addTeamsSchema>

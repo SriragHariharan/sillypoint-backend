@@ -16,6 +16,7 @@ import {
     LOGO_FOLDER,
     NOT_ALLOWED_TO_REMOVE_TEAM,
     NOT_ORGANIZER,
+    NOT_OPEN_FOR_UPDATE,
     ORGANIZER_CANNOT_ADD_TEAMS,
     TEAM_ALREADY_ENROLLED,
     TEAM_NOT_ENROLLED,
@@ -34,10 +35,11 @@ import {
     listTournamentTeams,
     listTournaments,
     markCancelled,
+    markPrizeMoneyUpdated,
     markRescheduled,
     type TournamentSummaryRow,
 } from "./tournaments.repository.js"
-import { type CreateTournamentInput, type ListTournamentsQuery, type RescheduleTournamentInput } from "./tournaments.schema.js"
+import { type CreateTournamentInput, type ListTournamentsQuery, type RescheduleTournamentInput, type UpdateTournamentInput } from "./tournaments.schema.js"
 
 type TournamentStatus = "upcoming" | "live" | "completed" | "cancelled"
 
@@ -83,6 +85,8 @@ export const createTournament = async (organizerId: number, input: CreateTournam
             location: input.location,
             startDate: input.startDate,
             endDate: input.endDate,
+            registrationFee: input.registrationFee,
+            prizeMoney: input.prizeMoney,
         })
         if (!row) throw new Error("Failed to create tournament")
         return toSummary(row, todayInTimezone(TOURNAMENT_TIMEZONE))
@@ -123,6 +127,22 @@ export const rescheduleTournament = async (userId: number, id: number, input: Re
     const row = await markRescheduled(id, input.startDate, input.endDate)
     // Cancelled by a parallel request between the check and the update
     if (!row) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
+
+    return toSummary(row, today)
+}
+
+// Change the prize money. Only the organizer can, and only while the tournament is not cancelled or finished.
+export const updateTournament = async (userId: number, id: number, input: UpdateTournamentInput) => {
+    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
+    const existing = await findTournamentForCancel(id)
+
+    if (!existing) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
+    if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
+    if (existing.cancelledAt || existing.endDate < today) throw new ConflictError(NOT_OPEN_FOR_UPDATE)
+
+    const row = await markPrizeMoneyUpdated(id, input.prizeMoney)
+    // Cancelled by a parallel request between the check and the update
+    if (!row) throw new ConflictError(NOT_OPEN_FOR_UPDATE)
 
     return toSummary(row, today)
 }

@@ -3,7 +3,7 @@ import { authenticate } from "../../shared/middleware/authenticate.js"
 import { imageUpload } from "../../shared/middleware/upload.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { LOGO_FIELD } from "./tournaments.constants.js"
-import { addTeams, cancel, create, details, list, listTeams, removeTeam, reschedule } from "./tournaments.controller.js"
+import { addTeams, cancel, create, details, list, listTeams, removeTeam, reschedule, update } from "./tournaments.controller.js"
 import {
     addTeamsSchema,
     createTournamentSchema,
@@ -11,6 +11,7 @@ import {
     listTournamentsQuerySchema,
     rescheduleTournamentSchema,
     tournamentIdParamsSchema,
+    updateTournamentSchema,
 } from "./tournaments.schema.js"
 
 const router = Router()
@@ -35,6 +36,9 @@ router.get("/:id/teams", validate(tournamentIdParamsSchema, "params"), listTeams
 
 // DELETE /api/tournaments/:id/teams/:teamId: organizer or the user who added the team
 router.delete("/:id/teams/:teamId", authenticate, validate(enrolledTeamParamsSchema, "params"), removeTeam)
+
+// PATCH /api/tournaments/:id: organizer only, prize money only
+router.patch("/:id", authenticate, validate(tournamentIdParamsSchema, "params"), validate(updateTournamentSchema), update)
 
 // GET /api/tournaments/:id: public details
 router.get("/:id", validate(tournamentIdParamsSchema, "params"), details)

@@ -38,3 +38,8 @@ export const ORGANIZER_CANNOT_ADD_TEAMS = "Organizers cannot add teams to their 
 export const CANCELLED_CANNOT_RESCHEDULE = "A cancelled tournament cannot be rescheduled"
 export const COMPLETED_CANNOT_RESCHEDULE = "A completed tournament cannot be rescheduled"
 export const TOURNAMENT_RESCHEDULED = "Tournament rescheduled"
+
+// Registration fee and prize money are whole rupees
+export const MAX_AMOUNT = 10_000_000
+export const PRIZE_MONEY_UPDATED = "Prize money updated"
+export const NOT_OPEN_FOR_UPDATE = "A cancelled or completed tournament cannot be edited"

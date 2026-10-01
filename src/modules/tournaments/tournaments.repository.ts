@@ -13,6 +13,8 @@ const summaryColumns = {
     location: tournaments.location,
     startDate: tournaments.startDate,
     endDate: tournaments.endDate,
+    registrationFee: tournaments.registrationFee,
+    prizeMoney: tournaments.prizeMoney,
     cancelledAt: tournaments.cancelledAt,
     createdAt: tournaments.createdAt,
 }
@@ -46,6 +48,8 @@ export const insertTournament = async (values: {
     location: string
     startDate: string
     endDate: string
+    registrationFee: number
+    prizeMoney: number
 }) => {
     const [row] = await db.insert(tournaments).values(values).returning(summaryColumns)
     return row
@@ -81,6 +85,16 @@ export const markRescheduled = async (id: number, startDate: string, endDate: st
     const [row] = await db
         .update(tournaments)
         .set({ startDate, endDate })
+        .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
+        .returning(summaryColumns)
+    return row
+}
+
+// Change only the prize money of a tournament that is not cancelled. The registration fee is never updated.
+export const markPrizeMoneyUpdated = async (id: number, prizeMoney: number) => {
+    const [row] = await db
+        .update(tournaments)
+        .set({ prizeMoney })
         .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
         .returning(summaryColumns)
     return row

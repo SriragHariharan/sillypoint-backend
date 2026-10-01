@@ -7,8 +7,9 @@ import {
     type ListTournamentsQuery,
     type RescheduleTournamentInput,
     type TournamentIdParams,
+    type UpdateTournamentInput,
 } from "./tournaments.schema.js"
-import { TEAM_REMOVED, TEAMS_ADDED, TOURNAMENT_RESCHEDULED } from "./tournaments.constants.js"
+import { TEAM_REMOVED, TEAMS_ADDED, PRIZE_MONEY_UPDATED, TOURNAMENT_RESCHEDULED } from "./tournaments.constants.js"
 import * as tournamentService from "./tournaments.service.js"
 
 // Create a tournament for the logged in user
@@ -26,6 +27,17 @@ export const cancel = async (_req: Request, res: Response) => {
     const { id } = res.locals.params as TournamentIdParams
     const tournament = await tournamentService.cancelTournament(res.locals.userId as number, id)
     return success(res, { message: "Tournament cancelled", tournament })
+}
+
+// Change the prize money (organizer only)
+export const update = async (req: Request, res: Response) => {
+    const { id } = res.locals.params as TournamentIdParams
+    const tournament = await tournamentService.updateTournament(
+        res.locals.userId as number,
+        id,
+        req.body as UpdateTournamentInput,
+    )
+    return success(res, { message: PRIZE_MONEY_UPDATED, tournament })
 }
 
 // Move a tournament to new dates (organizer only)
