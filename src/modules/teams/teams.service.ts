@@ -3,7 +3,7 @@ import { BadRequestError, NotFoundError } from "../../shared/http/errors.js"
 import { deleteImage, uploadImage, type UploadedImage } from "../../shared/storage/cloudinary.js"
 import { getMe } from "../auth/auth.service.js"
 import { LOGO_FOLDER, NOTHING_TO_UPDATE, TEAM_NOT_FOUND } from "./teams.constants.js"
-import { findTeamByManager, findTeamForUpdate, insertTeam, listTeamsByManager, updateTeam } from "./teams.repository.js"
+import { findManagedTeamIds, findTeamByManager, findTeamForUpdate, insertTeam, listTeamsByManager, updateTeam } from "./teams.repository.js"
 import { type CreateTeamInput, type UpdateTeamInput } from "./teams.schema.js"
 
 // Create a team. The manager is the logged in user, so only a real, active user can manage a team.
@@ -39,6 +39,12 @@ export const getMyTeam = async (managerId: number, id: number) => {
     const row = await findTeamByManager(id, managerId)
     if (!row) throw new NotFoundError(TEAM_NOT_FOUND)
     return row
+}
+
+// Make sure every id is a team the user manages. Someone else's team looks the same as a missing one.
+export const assertManagesTeams = async (managerId: number, ids: number[]) => {
+    const owned = await findManagedTeamIds(managerId, ids)
+    if (owned.length !== ids.length) throw new NotFoundError(TEAM_NOT_FOUND)
 }
 
 // Update a team the user manages. A new logo is uploaded first; the old one is deleted after the save.

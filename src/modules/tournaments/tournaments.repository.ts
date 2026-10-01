@@ -1,6 +1,7 @@
-import { and, count, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, or, type SQL } from "drizzle-orm"
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, type SQL } from "drizzle-orm"
 import { db } from "../../db/postgres.js"
-import { tournaments, users } from "../../db/schema/index.js"
+import { teams, tournamentTeams, tournaments, users } from "../../db/schema/index.js"
+import { type Tx } from "../users/users.repository.js"
 import { type ListTournamentsQuery } from "./tournaments.schema.js"
 
 // Columns sent to the client (never logo_public_id)
@@ -75,6 +76,16 @@ export const markCancelled = async (id: number) => {
     return row
 }
 
+// Move a tournament that is not cancelled to new dates. Returns nothing if someone cancelled it first.
+export const markRescheduled = async (id: number, startDate: string, endDate: string) => {
+    const [row] = await db
+        .update(tournaments)
+        .set({ startDate, endDate })
+        .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
+        .returning(summaryColumns)
+    return row
+}
+
 // One tournament with its organizer, or nothing
 export const findTournamentDetails = async (id: number) => {
     const [row] = await db
@@ -118,3 +129,53 @@ export const listTournaments = async (query: ListTournamentsQuery, today: string
 
     return { rows, total: totals[0]?.total ?? 0 }
 }
+
+// Team columns sent to the client for an enrolled team (no captain mobile: the list is public)
+const enrolledTeamColumns = {
+    id: teams.id,
+    name: teams.name,
+    logo: teams.logoUrl,
+    captain_name: teams.captainName,
+    added_by: tournamentTeams.addedBy,
+    created_at: tournamentTeams.createdAt,
+}
+
+// Which of these teams are already in the tournament
+export const findEnrolledTeamIds = async (tx: Tx, tournamentId: number, teamIds: number[]) => {
+    const rows = await tx
+        .select({ teamId: tournamentTeams.teamId })
+        .from(tournamentTeams)
+        .where(and(eq(tournamentTeams.tournamentId, tournamentId), inArray(tournamentTeams.teamId, teamIds)))
+    return rows.map((row) => row.teamId)
+}
+
+// Save the enrollments
+export const insertTournamentTeams = (tx: Tx, rows: { tournamentId: number; teamId: number; addedBy: number }[]) =>
+    tx.insert(tournamentTeams).values(rows)
+
+// Teams in a tournament, in the order they were added
+export const listTournamentTeams = (tournamentId: number, teamIds?: number[]) =>
+    db
+        .select(enrolledTeamColumns)
+        .from(tournamentTeams)
+        .innerJoin(teams, eq(teams.id, tournamentTeams.teamId))
+        .where(
+            teamIds
+                ? and(eq(tournamentTeams.tournamentId, tournamentId), inArray(tournamentTeams.teamId, teamIds))
+                : eq(tournamentTeams.tournamentId, tournamentId),
+        )
+        .orderBy(asc(tournamentTeams.createdAt), asc(tournamentTeams.id))
+
+// Lock one enrollment so two removals cannot race
+export const findEnrollmentForUpdate = async (tx: Tx, tournamentId: number, teamId: number) => {
+    const [row] = await tx
+        .select({ id: tournamentTeams.id, addedBy: tournamentTeams.addedBy })
+        .from(tournamentTeams)
+        .where(and(eq(tournamentTeams.tournamentId, tournamentId), eq(tournamentTeams.teamId, teamId)))
+        .limit(1)
+        .for("update")
+    return row
+}
+
+// Remove only the enrollment. The team itself is never touched.
+export const deleteEnrollment = (tx: Tx, id: number) => tx.delete(tournamentTeams).where(eq(tournamentTeams.id, id))

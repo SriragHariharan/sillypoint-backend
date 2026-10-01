@@ -1,28 +1,43 @@
 import sanitizeHtml from "sanitize-html"
+import { db } from "../../db/postgres.js"
 import { ConflictError, ForbiddenError, BadRequestError, NotFoundError } from "../../shared/http/errors.js"
 import { deleteImage, uploadImage, type UploadedImage } from "../../shared/storage/cloudinary.js"
 import { todayInTimezone } from "../../shared/utils/date.js"
 import { getMe } from "../auth/auth.service.js"
+import { assertManagesTeams } from "../teams/teams.service.js"
 import {
     ALREADY_CANCELLED,
     ALREADY_COMPLETED,
+    CANCELLED_CANNOT_RESCHEDULE,
+    COMPLETED_CANNOT_RESCHEDULE,
     DESCRIPTION_ALLOWED_TAGS,
     DESCRIPTION_MAX_TEXT_LENGTH,
     DESCRIPTION_TOO_LONG,
     LOGO_FOLDER,
+    NOT_ALLOWED_TO_REMOVE_TEAM,
     NOT_ORGANIZER,
+    ORGANIZER_CANNOT_ADD_TEAMS,
+    TEAM_ALREADY_ENROLLED,
+    TEAM_NOT_ENROLLED,
     TOURNAMENT_NOT_FOUND,
+    TOURNAMENT_NOT_OPEN,
     TOURNAMENT_TIMEZONE,
 } from "./tournaments.constants.js"
 import {
+    deleteEnrollment,
+    findEnrolledTeamIds,
+    findEnrollmentForUpdate,
     findTournamentDetails,
     findTournamentForCancel,
     insertTournament,
+    insertTournamentTeams,
+    listTournamentTeams,
     listTournaments,
     markCancelled,
+    markRescheduled,
     type TournamentSummaryRow,
 } from "./tournaments.repository.js"
-import { type CreateTournamentInput, type ListTournamentsQuery } from "./tournaments.schema.js"
+import { type CreateTournamentInput, type ListTournamentsQuery, type RescheduleTournamentInput } from "./tournaments.schema.js"
 
 type TournamentStatus = "upcoming" | "live" | "completed" | "cancelled"
 
@@ -95,6 +110,23 @@ export const cancelTournament = async (userId: number, id: number) => {
     return toSummary(row, today)
 }
 
+// Move a tournament to new dates. Only its organizer can, and only while it is not cancelled or finished.
+export const rescheduleTournament = async (userId: number, id: number, input: RescheduleTournamentInput) => {
+    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
+    const existing = await findTournamentForCancel(id)
+
+    if (!existing) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
+    if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
+    if (existing.cancelledAt) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
+    if (existing.endDate < today) throw new ConflictError(COMPLETED_CANNOT_RESCHEDULE)
+
+    const row = await markRescheduled(id, input.startDate, input.endDate)
+    // Cancelled by a parallel request between the check and the update
+    if (!row) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
+
+    return toSummary(row, today)
+}
+
 // Public list with filters and paging
 export const listAllTournaments = async (query: ListTournamentsQuery) => {
     const today = todayInTimezone(TOURNAMENT_TIMEZONE)
@@ -114,4 +146,73 @@ export const getTournament = async (id: number) => {
     if (!row) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
 
     return { ...toSummary(row, todayInTimezone(TOURNAMENT_TIMEZONE)), description: row.description, organizer: row.organizer }
+}
+
+// True if the database says this team is already in the tournament
+const isDuplicateEnrollment = (err: unknown) => {
+    const cause = err instanceof Error ? (err.cause ?? err) : err
+    return (
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        cause.code === "23505" &&
+        "table_name" in cause &&
+        cause.table_name === "tournament_teams"
+    )
+}
+
+// Add teams the user manages to a tournament that is not cancelled or finished. All teams are added, or none.
+export const addTeamsToTournament = async (userId: number, tournamentId: number, teamIds: number[]) => {
+    await getMe(userId)
+
+    const tournament = await findTournamentForCancel(tournamentId)
+    if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
+    if (tournament.organizerId === userId) throw new ForbiddenError(ORGANIZER_CANNOT_ADD_TEAMS)
+    if (tournament.cancelledAt || tournament.endDate < todayInTimezone(TOURNAMENT_TIMEZONE)) {
+        throw new ConflictError(TOURNAMENT_NOT_OPEN)
+    }
+
+    await assertManagesTeams(userId, teamIds)
+
+    try {
+        await db.transaction(async (tx) => {
+            const already = await findEnrolledTeamIds(tx, tournamentId, teamIds)
+            if (already.length > 0) throw new ConflictError(TEAM_ALREADY_ENROLLED)
+
+            await insertTournamentTeams(
+                tx,
+                teamIds.map((teamId) => ({ tournamentId, teamId, addedBy: userId })),
+            )
+        })
+    } catch (err) {
+        // Added by a parallel request between the check and the insert
+        if (isDuplicateEnrollment(err)) throw new ConflictError(TEAM_ALREADY_ENROLLED)
+        throw err
+    }
+
+    return listTournamentTeams(tournamentId, teamIds)
+}
+
+// Public list of the teams in a tournament
+export const listTeamsInTournament = async (tournamentId: number) => {
+    const tournament = await findTournamentForCancel(tournamentId)
+    if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
+
+    return listTournamentTeams(tournamentId)
+}
+
+// Remove a team from a tournament. Only the organizer or the user who added it can; the team itself stays.
+export const removeTeamFromTournament = async (userId: number, tournamentId: number, teamId: number) => {
+    const tournament = await findTournamentForCancel(tournamentId)
+    if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
+
+    await db.transaction(async (tx) => {
+        const enrollment = await findEnrollmentForUpdate(tx, tournamentId, teamId)
+        if (!enrollment) throw new NotFoundError(TEAM_NOT_ENROLLED)
+        if (userId !== tournament.organizerId && userId !== enrollment.addedBy) {
+            throw new ForbiddenError(NOT_ALLOWED_TO_REMOVE_TEAM)
+        }
+
+        await deleteEnrollment(tx, enrollment.id)
+    })
 }

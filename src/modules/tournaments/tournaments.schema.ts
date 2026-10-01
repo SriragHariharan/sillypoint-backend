@@ -5,6 +5,7 @@ import {
     LIST_DEFAULT_LIMIT,
     LIST_MAX_LIMIT,
     LOCATION_MAX_LENGTH,
+    MAX_TEAMS_PER_REQUEST,
     NAME_MAX_LENGTH,
     NAME_MIN_LENGTH,
     SEARCH_MAX_LENGTH,
@@ -18,9 +19,21 @@ const isoDate = (label: string) =>
         .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must be YYYY-MM-DD`)
         .refine(isRealDate, `${label} is not a valid date`)
 
+// The date rules shared by create and reschedule
+const withDateRules = <T extends z.ZodType<{ startDate: string; endDate: string }>>(schema: T) =>
+    schema
+        .refine((body) => body.startDate >= todayInTimezone(TOURNAMENT_TIMEZONE), {
+            message: "Start date cannot be in the past",
+            path: ["startDate"],
+        })
+        .refine((body) => body.endDate >= body.startDate, {
+            message: "End date must be on or after the start date",
+            path: ["endDate"],
+        })
+
 // Create body (multipart, so every value arrives as text). The organizer is never read from the body.
-export const createTournamentSchema = z
-    .object({
+export const createTournamentSchema = withDateRules(
+    z.object({
         name: z
             .string({ error: "Name is required" })
             .trim()
@@ -37,18 +50,32 @@ export const createTournamentSchema = z
             .max(LOCATION_MAX_LENGTH, `Location must be at most ${LOCATION_MAX_LENGTH} characters`),
         startDate: isoDate("Start date"),
         endDate: isoDate("End date"),
-    })
-    .refine((body) => body.startDate >= todayInTimezone(TOURNAMENT_TIMEZONE), {
-        message: "Start date cannot be in the past",
-        path: ["startDate"],
-    })
-    .refine((body) => body.endDate >= body.startDate, {
-        message: "End date must be on or after the start date",
-        path: ["endDate"],
-    })
+    }),
+)
+
+export const rescheduleTournamentSchema = withDateRules(
+    z.object({
+        startDate: isoDate("Start date"),
+        endDate: isoDate("End date"),
+    }),
+)
 
 export const tournamentIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid tournament id" }).int().positive("Invalid tournament id"),
+})
+
+export const enrolledTeamParamsSchema = tournamentIdParamsSchema.extend({
+    teamId: z.coerce.number({ error: "Invalid team id" }).int().positive("Invalid team id"),
+})
+
+export const addTeamsSchema = z.object({
+    team_ids: z
+        .array(z.number({ error: "Invalid team id" }).int("Invalid team id").positive("Invalid team id"), {
+            error: "team_ids must be a list of team ids",
+        })
+        .min(1, "Select at least one team")
+        .max(MAX_TEAMS_PER_REQUEST, `You can add at most ${MAX_TEAMS_PER_REQUEST} teams at once`)
+        .transform((ids) => [...new Set(ids)]),
 })
 
 // List query: every filter is optional
@@ -78,5 +105,8 @@ export const listTournamentsQuerySchema = z
     })
 
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>
+export type RescheduleTournamentInput = z.infer<typeof rescheduleTournamentSchema>
 export type TournamentIdParams = z.infer<typeof tournamentIdParamsSchema>
+export type EnrolledTeamParams = z.infer<typeof enrolledTeamParamsSchema>
+export type AddTeamsInput = z.infer<typeof addTeamsSchema>
 export type ListTournamentsQuery = z.infer<typeof listTournamentsQuerySchema>

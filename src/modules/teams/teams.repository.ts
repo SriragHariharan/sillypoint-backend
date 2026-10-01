@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { db } from "../../db/postgres.js"
 import { teams } from "../../db/schema/index.js"
 import { type Tx } from "../users/users.repository.js"
@@ -41,6 +41,15 @@ export const findTeamByManager = async (id: number, managerId: number) => {
 // All teams managed by this user, newest first
 export const listTeamsByManager = (managerId: number) =>
     db.select(teamColumns).from(teams).where(eq(teams.managerId, managerId)).orderBy(desc(teams.createdAt), desc(teams.id))
+
+// Which of these teams this user manages
+export const findManagedTeamIds = async (managerId: number, ids: number[]) => {
+    const rows = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.managerId, managerId), inArray(teams.id, ids)))
+    return rows.map((row) => row.id)
+}
 
 // Lock the team row (only if this user manages it) and get its current logo
 export const findTeamForUpdate = async (tx: Tx, id: number, managerId: number) => {

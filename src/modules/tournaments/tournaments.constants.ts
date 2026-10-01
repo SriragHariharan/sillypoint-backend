@@ -26,3 +26,15 @@ export const NOT_ORGANIZER = "Only the organizer can do this"
 export const ALREADY_CANCELLED = "Tournament is already cancelled"
 export const ALREADY_COMPLETED = "A completed tournament cannot be cancelled"
 export const DESCRIPTION_TOO_LONG = `Description must be at most ${DESCRIPTION_MAX_TEXT_LENGTH} characters`
+
+export const MAX_TEAMS_PER_REQUEST = 50
+export const TEAMS_ADDED = "Teams added"
+export const TEAM_REMOVED = "Team removed"
+export const TOURNAMENT_NOT_OPEN = "Teams cannot be added to a cancelled or completed tournament"
+export const TEAM_ALREADY_ENROLLED = "One or more teams are already added to this tournament"
+export const TEAM_NOT_ENROLLED = "Team is not in this tournament"
+export const NOT_ALLOWED_TO_REMOVE_TEAM = "Only the organizer or the user who added the team can remove it"
+export const ORGANIZER_CANNOT_ADD_TEAMS = "Organizers cannot add teams to their own tournament"
+export const CANCELLED_CANNOT_RESCHEDULE = "A cancelled tournament cannot be rescheduled"
+export const COMPLETED_CANNOT_RESCHEDULE = "A completed tournament cannot be rescheduled"
+export const TOURNAMENT_RESCHEDULED = "Tournament rescheduled"
