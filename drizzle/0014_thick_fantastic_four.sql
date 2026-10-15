@@ -1,0 +1,2 @@
+ALTER TABLE "matches" ADD COLUMN "stage" varchar(20);--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_stage_valid" CHECK ("matches"."stage" is null or "matches"."stage" in ('group_stage', 'eliminator', 'qualifier', 'quarter_final', 'semi_final', 'final'));

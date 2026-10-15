@@ -236,3 +236,10 @@ export const removeTeamFromTournament = async (userId: number, tournamentId: num
         await deleteEnrollment(tx, enrollment.id)
     })
 }
+
+// True if every one of these teams is enrolled in the tournament
+export const areTeamsEnrolled = async (tournamentId: number, teamIds: number[]) => {
+    const unique = [...new Set(teamIds)]
+    const enrolled = await listTournamentTeams(tournamentId, unique)
+    return enrolled.length === unique.length
+}
