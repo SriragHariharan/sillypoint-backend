@@ -43,6 +43,12 @@ export const findMatch = async (id: number) => {
     return row
 }
 
+// Move a match to a new time. Returns nothing if the match is gone.
+export const updateMatchSchedule = async (id: number, scheduledAt: Date) => {
+    const [row] = await db.update(matches).set({ scheduledAt }).where(eq(matches.id, id)).returning({ id: matches.id })
+    return row
+}
+
 // Matches of a tournament, earliest first
 export const listTournamentMatches = (tournamentId: number) =>
     selectMatches().where(eq(matches.tournamentId, tournamentId)).orderBy(asc(matches.scheduledAt), asc(matches.id))
