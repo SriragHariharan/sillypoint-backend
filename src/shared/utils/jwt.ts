@@ -1,6 +1,12 @@
 import jwt from "jsonwebtoken"
 import { env } from "../config/env.js"
-import { ACCESS_TOKEN_AUDIENCE, JWT_ALGORITHM, JWT_ISSUER, REFRESH_TOKEN_AUDIENCE } from "../constants/jwt.js"
+import {
+    ACCESS_TOKEN_AUDIENCE,
+    JWT_ALGORITHM,
+    JWT_ISSUER,
+    REFRESH_TOKEN_AUDIENCE,
+    SCORER_TOKEN_AUDIENCE,
+} from "../constants/jwt.js"
 
 export type AccessClaims = { sub: string }
 export type RefreshClaims = { sub: string; jti: string; fam: string }
@@ -29,6 +35,17 @@ export const verifyAccessToken = (token: string): AccessClaims => {
     }
 
     return { sub: payload.sub }
+}
+
+// Create a scorer token for one match (short-lived; not a user session)
+export const signScorerToken = (matchId: number, ttlSeconds: number) => {
+    return jwt.sign({}, env.accessTokenSecret, {
+        algorithm: JWT_ALGORITHM,
+        issuer: JWT_ISSUER,
+        audience: SCORER_TOKEN_AUDIENCE,
+        subject: String(matchId),
+        expiresIn: ttlSeconds,
+    })
 }
 
 // Create a refresh token. jti is unique per token, familyId is shared by one login session.

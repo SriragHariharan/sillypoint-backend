@@ -2,8 +2,14 @@ import { Router } from "express"
 import { authenticate } from "../../shared/middleware/authenticate.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { tournamentIdParamsSchema } from "../tournaments/tournaments.schema.js"
-import { create, details, list, reschedule } from "./matches.controller.js"
-import { createMatchSchema, matchIdParamsSchema, rescheduleMatchSchema } from "./matches.schema.js"
+import { addScorer, create, details, list, reschedule, scorerAccess, scorerLogin } from "./matches.controller.js"
+import {
+    addScorerSchema,
+    createMatchSchema,
+    matchIdParamsSchema,
+    rescheduleMatchSchema,
+    scorerLoginSchema,
+} from "./matches.schema.js"
 
 const router = Router()
 
@@ -27,5 +33,17 @@ matchRouter.patch(
     validate(rescheduleMatchSchema),
     reschedule,
 )
+
+// POST /api/matches/:id/scorer: organizer only, one scorer per match
+matchRouter.post("/:id/scorer", authenticate, validate(matchIdParamsSchema, "params"), validate(addScorerSchema), addScorer)
+
+// GET /api/matches/:id/scorer/access: organizer only, the scorer's login link token and PIN
+matchRouter.get("/:id/scorer/access", authenticate, validate(matchIdParamsSchema, "params"), scorerAccess)
+
+// Routes mounted at /api/scorer
+export const scorerRouter = Router()
+
+// POST /api/scorer/login: public, the scorer proves themselves with the link token, mobile and PIN
+scorerRouter.post("/login", validate(scorerLoginSchema), scorerLogin)
 
 export default router

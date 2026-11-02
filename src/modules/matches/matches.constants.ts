@@ -17,3 +17,25 @@ export const TEAM_NOT_IN_TOURNAMENT = "Both teams must be enrolled in this tourn
 export const TOURNAMENT_NOT_OPEN = "Matches cannot be added to a cancelled or completed tournament"
 export const DATE_OUTSIDE_TOURNAMENT = "Match date must be within the tournament dates"
 export const MATCH_IN_PAST = "Match time cannot be in the past"
+
+export const SCORER_NAME_MIN_LENGTH = 2
+export const SCORER_NAME_MAX_LENGTH = 60
+export const SCORER_MOBILE_PATTERN = "^[6-9][0-9]{9}$"
+export const SCORER_ADDED = "Scorer added"
+export const SCORER_ALREADY_ADDED = "This match already has a scorer"
+export const TOURNAMENT_NOT_OPEN_FOR_SCORER = "A scorer cannot be added to a match of a cancelled or completed tournament"
+
+export const SCORER_PIN_LENGTH = 6
+// 32 random bytes become 43 base64url characters
+export const SCORER_LINK_TOKEN_BYTES = 32
+export const SCORER_LINK_TOKEN_MAX_LENGTH = 64
+// Wrong mobile/PIN tries in a row before the scorer login of a match is locked
+export const SCORER_PIN_MAX_ATTEMPTS = 5
+// How long the scorer login stays locked after too many wrong tries (30 minutes)
+export const SCORER_LOCK_MS = 30 * 60 * 1000
+// Scorer session token lifetime (12 hours)
+export const SCORER_TOKEN_TTL_SECONDS = 12 * 60 * 60
+export const NO_SCORER = "This match has no scorer"
+export const SCORER_INVALID_LOGIN = "Invalid mobile number or PIN"
+export const SCORER_LOCKED = "Too many attempts. Try again in"
+export const TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN = "This tournament is no longer open for scoring"

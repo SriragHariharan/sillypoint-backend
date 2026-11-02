@@ -1,0 +1,3 @@
+ALTER TABLE "matches" ADD COLUMN "scorer_name" varchar(60);--> statement-breakpoint
+ALTER TABLE "matches" ADD COLUMN "scorer_mobile" varchar(10);--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_scorer_valid" CHECK (("matches"."scorer_name" is null and "matches"."scorer_mobile" is null) or ("matches"."scorer_name" is not null and "matches"."scorer_mobile" ~ '^[6-9][0-9]{9}$'));
