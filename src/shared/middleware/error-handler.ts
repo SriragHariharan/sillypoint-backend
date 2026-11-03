@@ -7,6 +7,8 @@ export const errorHandler = (err: unknown, _req: Request, res: Response, _next: 
         return failure(res, err.message, err.statusCode)
     }
 
-    console.error("Unhandled error:", err instanceof Error ? err.message : "unknown")
+    // Drivers wrap the real reason (e.g. a database timeout) in err.cause
+    const cause = err instanceof Error && err.cause instanceof Error ? ` | cause: ${err.cause.message}` : ""
+    console.error("Unhandled error:", (err instanceof Error ? err.message : "unknown") + cause)
     return failure(res, "Internal server error", 500)
 }
