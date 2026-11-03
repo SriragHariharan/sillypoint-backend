@@ -48,6 +48,21 @@ export const signScorerToken = (matchId: number, ttlSeconds: number) => {
     })
 }
 
+// Check a scorer token and return its claims (sub is the match id); throws if it is invalid or expired
+export const verifyScorerToken = (token: string): AccessClaims => {
+    const payload = jwt.verify(token, env.accessTokenSecret, {
+        algorithms: [JWT_ALGORITHM],
+        issuer: JWT_ISSUER,
+        audience: SCORER_TOKEN_AUDIENCE,
+    })
+
+    if (typeof payload === "string" || typeof payload.sub !== "string") {
+        throw new Error("Invalid token claims")
+    }
+
+    return { sub: payload.sub }
+}
+
 // Create a refresh token. jti is unique per token, familyId is shared by one login session.
 export const signRefreshToken = (params: { userId: number; jti: string; familyId: string; ttlSeconds: number }) => {
     return jwt.sign({ fam: params.familyId }, env.refreshTokenSecret, {

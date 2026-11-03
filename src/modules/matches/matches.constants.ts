@@ -39,3 +39,6 @@ export const NO_SCORER = "This match has no scorer"
 export const SCORER_INVALID_LOGIN = "Invalid mobile number or PIN"
 export const SCORER_LOCKED = "Too many attempts. Try again in"
 export const TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN = "This tournament is no longer open for scoring"
+// The scorer can open the scoring screen this long before the scheduled start (30 minutes)
+export const SCORING_OPENS_BEFORE_MS = 30 * 60 * 1000
+export const SCORING_NOT_OPEN = "Scoring opens 30 minutes before the match starts"

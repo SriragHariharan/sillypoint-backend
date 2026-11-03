@@ -1,8 +1,9 @@
 import { Router } from "express"
 import { authenticate } from "../../shared/middleware/authenticate.js"
+import { authenticateScorer } from "../../shared/middleware/authenticate-scorer.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { tournamentIdParamsSchema } from "../tournaments/tournaments.schema.js"
-import { addScorer, create, details, list, reschedule, scorerAccess, scorerLogin } from "./matches.controller.js"
+import { addScorer, create, details, list, reschedule, scorerAccess, scorerLogin, scorerMe } from "./matches.controller.js"
 import {
     addScorerSchema,
     createMatchSchema,
@@ -45,5 +46,8 @@ export const scorerRouter = Router()
 
 // POST /api/scorer/login: public, the scorer proves themselves with the link token, mobile and PIN
 scorerRouter.post("/login", validate(scorerLoginSchema), scorerLogin)
+
+// GET /api/scorer/me: scorer token only, the session behind it (also tells when scoring opens)
+scorerRouter.get("/me", authenticateScorer, scorerMe)
 
 export default router

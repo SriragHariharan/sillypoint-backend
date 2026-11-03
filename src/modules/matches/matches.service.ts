@@ -19,6 +19,8 @@ import {
     NO_SCORER,
     SCORER_ALREADY_ADDED,
     SCORER_INVALID_LOGIN,
+    SCORING_NOT_OPEN,
+    SCORING_OPENS_BEFORE_MS,
     SCORER_LINK_TOKEN_BYTES,
     SCORER_LOCK_MS,
     SCORER_LOCKED,
@@ -200,15 +202,35 @@ export const scorerLogin = async (input: ScorerLoginInput) => {
         throw new UnauthorizedError(SCORER_INVALID_LOGIN)
     }
 
-    const tournament = await getTournament(row.tournamentId)
+    const session = scorerSessionOf(await matchWithTournament(row.id))
+
+    await clearScorerLoginFailures(row.id)
+    return { accessToken: signScorerToken(row.id, SCORER_TOKEN_TTL_SECONDS), ...session }
+}
+
+// What the scorer's screen needs: who they are, the match, the server clock and when scoring opens
+const scorerSessionOf = ({ match, tournament }: Awaited<ReturnType<typeof matchWithTournament>>) => {
+    if (!match.scorerName) throw new UnauthorizedError(SCORER_INVALID_LOGIN)
     if (tournament.status === "cancelled" || tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN)
     }
 
-    await clearScorerLoginFailures(row.id)
     return {
-        accessToken: signScorerToken(row.id, SCORER_TOKEN_TTL_SECONDS),
-        scorer: { name: row.scorerName },
-        match: await getMatch(row.id),
+        scorer: { name: match.scorerName },
+        match,
+        serverTime: new Date().toISOString(),
+        scoringOpensAt: scoringOpensAt(match.scheduledAt).toISOString(),
     }
+}
+
+// The moment the scorer may start scoring: shortly before the scheduled start
+const scoringOpensAt = (scheduledAt: Date) => new Date(scheduledAt.getTime() - SCORING_OPENS_BEFORE_MS)
+
+// The logged-in scorer's session again (page refresh), read fresh so a reschedule or cancellation shows up
+export const getScorerSession = async (matchId: number) => scorerSessionOf(await matchWithTournament(matchId))
+
+// Every scoring endpoint calls this: the scorer can only score from 30 minutes before the match starts
+export const assertScoringOpen = async (matchId: number) => {
+    const match = await getMatch(matchId)
+    if (scoringOpensAt(match.scheduledAt).getTime() > Date.now()) throw new ForbiddenError(SCORING_NOT_OPEN)
 }

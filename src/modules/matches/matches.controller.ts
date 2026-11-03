@@ -58,3 +58,9 @@ export const scorerLogin = async (req: Request, res: Response) => {
     const session = await matchService.scorerLogin(req.body as ScorerLoginInput)
     return success(res, session)
 }
+
+// The logged-in scorer's session again, so a page refresh keeps them logged in (scorer token)
+export const scorerMe = async (_req: Request, res: Response) => {
+    const session = await matchService.getScorerSession(res.locals.matchId as number)
+    return success(res, session)
+}
