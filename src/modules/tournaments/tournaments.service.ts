@@ -87,6 +87,8 @@ export const createTournament = async (organizerId: number, input: CreateTournam
             endDate: input.endDate,
             registrationFee: input.registrationFee,
             prizeMoney: input.prizeMoney,
+            playersPerSide: input.playersPerSide,
+            substitutesPerSide: input.substitutesPerSide,
         })
         if (!row) throw new Error("Failed to create tournament")
         return toSummary(row, todayInTimezone(TOURNAMENT_TIMEZONE))

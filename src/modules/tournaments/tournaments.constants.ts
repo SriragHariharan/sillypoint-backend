@@ -42,4 +42,9 @@ export const TOURNAMENT_RESCHEDULED = "Tournament rescheduled"
 // Registration fee and prize money are whole rupees
 export const MAX_AMOUNT = 10_000_000
 export const PRIZE_MONEY_UPDATED = "Prize money updated"
+
+// How many players and substitutes each team names for a match; the organizer picks both when creating the tournament.
+// The upper limits (11 and 4) are PLAYING_XI_SIZE and SUBSTITUTES_SIZE in shared/constants/squads.ts.
+export const MIN_PLAYERS_PER_SIDE = 5
+export const MIN_SUBSTITUTES_PER_SIDE = 0
 export const NOT_OPEN_FOR_UPDATE = "A cancelled or completed tournament cannot be edited"

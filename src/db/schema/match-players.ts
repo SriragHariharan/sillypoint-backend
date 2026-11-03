@@ -1,13 +1,8 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, pgTable, smallint, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core"
 
-import {
-    PLAYER_NAME_MAX_LENGTH,
-    PLAYING_XI_SIZE,
-    SQUAD_MAX_LENGTH,
-    SQUADS,
-    SUBSTITUTES_SIZE,
-} from "../../modules/squads/squads.constants.js"
+import { PLAYING_XI_SIZE, SUBSTITUTES_SIZE } from "../../shared/constants/squads.js"
+import { PLAYER_NAME_MAX_LENGTH, SQUAD_MAX_LENGTH, SQUADS } from "../../modules/squads/squads.constants.js"
 import { matches } from "./matches.js"
 import { teams } from "./teams.js"
 

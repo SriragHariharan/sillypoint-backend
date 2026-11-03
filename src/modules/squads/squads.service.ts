@@ -1,4 +1,6 @@
+import { BadRequestError } from "../../shared/http/errors.js"
 import { assertScoringOpen } from "../matches/matches.service.js"
+import { TOO_MANY_PLAYERS } from "./squads.constants.js"
 import { type PlayerRow, findMatchPlayers, replaceMatchPlayers } from "./squads.repository.js"
 import { type SaveSquadsInput } from "./squads.schema.js"
 
@@ -27,6 +29,17 @@ export const getSquads = async (matchId: number) => {
 // Save both teams' players (replaces what was there); the array order is the position
 export const saveSquads = async (matchId: number, input: SaveSquadsInput) => {
     const match = await assertScoringOpen(matchId)
+
+    // The tournament decides how many players and substitutes a team may name
+    const { playersPerSide, substitutesPerSide } = match.tournament
+    for (const side of [input.teamA, input.teamB]) {
+        if (side.playing.length > playersPerSide) {
+            throw new BadRequestError(`${TOO_MANY_PLAYERS} ${playersPerSide} players per team`)
+        }
+        if (side.substitutes.length > substitutesPerSide) {
+            throw new BadRequestError(`${TOO_MANY_PLAYERS} ${substitutesPerSide} substitutes per team`)
+        }
+    }
 
     const rowsFor = (teamId: number, side: SaveSquadsInput["teamA"]): PlayerRow[] => [
         ...side.playing.map((player, index) => ({

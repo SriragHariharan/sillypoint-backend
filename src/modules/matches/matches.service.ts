@@ -111,6 +111,8 @@ const matchWithTournament = async (id: number) => {
                 endDate: tournament.endDate,
                 status: tournament.status,
                 organizerId: tournament.organizerId,
+                playersPerSide: tournament.playersPerSide,
+                substitutesPerSide: tournament.substitutesPerSide,
             },
         },
         tournament,

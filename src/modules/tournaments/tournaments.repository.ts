@@ -15,6 +15,8 @@ const summaryColumns = {
     endDate: tournaments.endDate,
     registrationFee: tournaments.registrationFee,
     prizeMoney: tournaments.prizeMoney,
+    playersPerSide: tournaments.playersPerSide,
+    substitutesPerSide: tournaments.substitutesPerSide,
     cancelledAt: tournaments.cancelledAt,
     createdAt: tournaments.createdAt,
 }
@@ -50,6 +52,8 @@ export const insertTournament = async (values: {
     endDate: string
     registrationFee: number
     prizeMoney: number
+    playersPerSide: number
+    substitutesPerSide: number
 }) => {
     const [row] = await db.insert(tournaments).values(values).returning(summaryColumns)
     return row

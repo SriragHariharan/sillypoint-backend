@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { PLAYING_XI_SIZE, SUBSTITUTES_SIZE } from "../../shared/constants/squads.js"
 import { isRealDate, todayInTimezone } from "../../shared/utils/date.js"
 import {
     DESCRIPTION_MAX_HTML_LENGTH,
@@ -7,6 +8,8 @@ import {
     LOCATION_MAX_LENGTH,
     MAX_AMOUNT,
     MAX_TEAMS_PER_REQUEST,
+    MIN_PLAYERS_PER_SIDE,
+    MIN_SUBSTITUTES_PER_SIDE,
     NAME_MAX_LENGTH,
     NAME_MIN_LENGTH,
     SEARCH_MAX_LENGTH,
@@ -28,6 +31,15 @@ const amountText = (label: string) =>
         .regex(/^\d+$/, `${label} must be a whole number`)
         .transform(Number)
         .refine((value) => value <= MAX_AMOUNT, `${label} must be at most ${MAX_AMOUNT}`)
+
+// A whole number within a range sent as form text, like "11"
+const countText = (label: string, min: number, max: number) =>
+    z
+        .string({ error: `${label} is required` })
+        .trim()
+        .regex(/^\d+$/, `${label} must be a whole number`)
+        .transform(Number)
+        .refine((value) => value >= min && value <= max, `${label} must be between ${min} and ${max}`)
 
 // The date rules shared by create and reschedule
 const withDateRules = <T extends z.ZodType<{ startDate: string; endDate: string }>>(schema: T) =>
@@ -62,6 +74,8 @@ export const createTournamentSchema = withDateRules(
         endDate: isoDate("End date"),
         registrationFee: amountText("Registration fee"),
         prizeMoney: amountText("Prize money"),
+        playersPerSide: countText("Players per side", MIN_PLAYERS_PER_SIDE, PLAYING_XI_SIZE),
+        substitutesPerSide: countText("Substitutes per side", MIN_SUBSTITUTES_PER_SIDE, SUBSTITUTES_SIZE),
     }),
 )
 
@@ -76,7 +90,7 @@ export const tournamentIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid tournament id" }).int().positive("Invalid tournament id"),
 })
 
-// Only the prize money can change after creation. strict() rejects any other key, including registrationFee.
+// Only the prize money can change after creation. strict() rejects any other key, including registrationFee, playersPerSide and substitutesPerSide.
 export const updateTournamentSchema = z
     .object({
         prizeMoney: z

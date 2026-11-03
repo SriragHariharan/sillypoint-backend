@@ -134,6 +134,13 @@
       "when": 1793675748132,
       "tag": "0018_overrated_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793676944461,
+      "tag": "0019_loud_ultron",
+      "breakpoints": true
     }
   ]
 }

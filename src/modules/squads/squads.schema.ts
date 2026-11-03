@@ -1,5 +1,6 @@
 import { z } from "zod"
-import { DUPLICATE_PLAYER, PLAYER_NAME_MAX_LENGTH, PLAYING_XI_SIZE, SUBSTITUTES_SIZE } from "./squads.constants.js"
+import { PLAYING_XI_SIZE, SUBSTITUTES_SIZE } from "../../shared/constants/squads.js"
+import { DUPLICATE_PLAYER, PLAYER_NAME_MAX_LENGTH } from "./squads.constants.js"
 
 const player = z.object({
     name: z
