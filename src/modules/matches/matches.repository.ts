@@ -18,6 +18,9 @@ const matchColumns = {
     notes: matches.notes,
     // The scorer's mobile is stored but never sent to the client
     scorerName: matches.scorerName,
+    // Who won the toss and what they chose (bat or bowl); both null until the scorer records it
+    tossWinnerTeamId: matches.tossWinnerTeamId,
+    tossDecision: matches.tossDecision,
     createdAt: matches.createdAt,
     teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
     teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },
@@ -51,6 +54,16 @@ export const findMatch = async (id: number) => {
 // Move a match to a new time. Returns nothing if the match is gone.
 export const updateMatchSchedule = async (id: number, scheduledAt: Date) => {
     const [row] = await db.update(matches).set({ scheduledAt }).where(eq(matches.id, id)).returning({ id: matches.id })
+    return row
+}
+
+// Record (or change) the toss. Returns nothing if the match is gone.
+export const setMatchToss = async (id: number, tossWinnerTeamId: number, tossDecision: string) => {
+    const [row] = await db
+        .update(matches)
+        .set({ tossWinnerTeamId, tossDecision })
+        .where(eq(matches.id, id))
+        .returning({ id: matches.id })
     return row
 }
 

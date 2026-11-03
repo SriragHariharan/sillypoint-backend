@@ -3,13 +3,24 @@ import { authenticate } from "../../shared/middleware/authenticate.js"
 import { authenticateScorer } from "../../shared/middleware/authenticate-scorer.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { tournamentIdParamsSchema } from "../tournaments/tournaments.schema.js"
-import { addScorer, create, details, list, reschedule, scorerAccess, scorerLogin, scorerMe } from "./matches.controller.js"
+import {
+    addScorer,
+    create,
+    details,
+    list,
+    reschedule,
+    scorerAccess,
+    scorerLogin,
+    scorerMe,
+    scorerToss,
+} from "./matches.controller.js"
 import {
     addScorerSchema,
     createMatchSchema,
     matchIdParamsSchema,
     rescheduleMatchSchema,
     scorerLoginSchema,
+    setTossSchema,
 } from "./matches.schema.js"
 
 const router = Router()
@@ -49,5 +60,8 @@ scorerRouter.post("/login", validate(scorerLoginSchema), scorerLogin)
 
 // GET /api/scorer/me: scorer token only, the session behind it (also tells when scoring opens)
 scorerRouter.get("/me", authenticateScorer, scorerMe)
+
+// PUT /api/scorer/toss: scorer token, once scoring has opened; records or changes the toss
+scorerRouter.put("/toss", authenticateScorer, validate(setTossSchema), scorerToss)
 
 export default router

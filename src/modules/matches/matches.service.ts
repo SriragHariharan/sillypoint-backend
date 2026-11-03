@@ -27,6 +27,7 @@ import {
     SCORER_PIN_LENGTH,
     SCORER_TOKEN_TTL_SECONDS,
     TEAM_NOT_IN_TOURNAMENT,
+    TOSS_TEAM_NOT_IN_MATCH,
     TOURNAMENT_NOT_OPEN,
     TOURNAMENT_NOT_OPEN_FOR_RESCHEDULE,
     TOURNAMENT_NOT_OPEN_FOR_SCORER,
@@ -42,6 +43,7 @@ import {
     recordScorerLoginFailure,
     type ScorerAccess,
     setMatchScorer,
+    setMatchToss,
     setScorerAccess,
     updateMatchSchedule,
 } from "./matches.repository.js"
@@ -50,6 +52,7 @@ import {
     type CreateMatchInput,
     type RescheduleMatchInput,
     type ScorerLoginInput,
+    type SetTossInput,
 } from "./matches.schema.js"
 
 // Schedule a match between two enrolled teams. Only the tournament's organizer can.
@@ -229,8 +232,25 @@ const scoringOpensAt = (scheduledAt: Date) => new Date(scheduledAt.getTime() - S
 // The logged-in scorer's session again (page refresh), read fresh so a reschedule or cancellation shows up
 export const getScorerSession = async (matchId: number) => scorerSessionOf(await matchWithTournament(matchId))
 
-// Every scoring endpoint calls this: the scorer can only score from 30 minutes before the match starts
+// Every scoring endpoint calls this: the tournament must still be open and the scorer can only score from 30 minutes before the match starts. Returns the match.
 export const assertScoringOpen = async (matchId: number) => {
-    const match = await getMatch(matchId)
+    const { match, tournament } = await matchWithTournament(matchId)
+    if (tournament.status === "cancelled" || tournament.status === "completed") {
+        throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN)
+    }
     if (scoringOpensAt(match.scheduledAt).getTime() > Date.now()) throw new ForbiddenError(SCORING_NOT_OPEN)
+    return match
+}
+
+// Record or change which team won the toss and what it chose
+export const setToss = async (matchId: number, input: SetTossInput) => {
+    const match = await assertScoringOpen(matchId)
+    if (input.winnerTeamId !== match.teamA.id && input.winnerTeamId !== match.teamB.id) {
+        throw new BadRequestError(TOSS_TEAM_NOT_IN_MATCH)
+    }
+
+    const updated = await setMatchToss(matchId, input.winnerTeamId, input.decision)
+    if (!updated) throw new NotFoundError(MATCH_NOT_FOUND)
+
+    return getMatch(matchId)
 }

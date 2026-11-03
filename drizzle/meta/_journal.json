@@ -120,6 +120,20 @@
       "when": 1793620052418,
       "tag": "0016_chief_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793674938506,
+      "tag": "0017_curious_changeling",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793675748132,
+      "tag": "0018_overrated_beast",
+      "breakpoints": true
     }
   ]
 }

@@ -42,3 +42,10 @@ export const TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN = "This tournament is no longe
 // The scorer can open the scoring screen this long before the scheduled start (30 minutes)
 export const SCORING_OPENS_BEFORE_MS = 30 * 60 * 1000
 export const SCORING_NOT_OPEN = "Scoring opens 30 minutes before the match starts"
+
+// What the team that won the toss chose to do
+export const TOSS_DECISIONS = ["bat", "bowl"] as const
+export const TOSS_DECISION_MAX_LENGTH = 4
+export const INVALID_TOSS_DECISION = "Choose batting or bowling"
+export const TOSS_TEAM_NOT_IN_MATCH = "The toss winner must be one of the two teams of this match"
+export const TOSS_SAVED = "Toss saved"

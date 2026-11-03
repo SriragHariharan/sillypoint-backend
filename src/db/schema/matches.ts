@@ -8,6 +8,8 @@ import {
     SCORER_NAME_MAX_LENGTH,
     SCORER_PIN_LENGTH,
     STAGE_MAX_LENGTH,
+    TOSS_DECISION_MAX_LENGTH,
+    TOSS_DECISIONS,
 } from "../../modules/matches/matches.constants.js"
 import { teams } from "./teams.js"
 import { tournaments } from "./tournaments.js"
@@ -42,6 +44,9 @@ export const matches = pgTable(
         // Wrong mobile/PIN tries in a row; at the limit the scorer login is locked until scorer_locked_until
         scorerPinAttempts: integer("scorer_pin_attempts").notNull().default(0),
         scorerLockedUntil: timestamp("scorer_locked_until", { withTimezone: true }),
+        // The toss: the winning team (one of the two teams) and what it chose; both are set together
+        tossWinnerTeamId: integer("toss_winner_team_id").references(() => teams.id, { onDelete: "restrict" }),
+        tossDecision: varchar("toss_decision", { length: TOSS_DECISION_MAX_LENGTH }),
         createdBy: integer("created_by")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
@@ -59,6 +64,10 @@ export const matches = pgTable(
         check(
             "matches_scorer_valid",
             sql`(${table.scorerName} is null and ${table.scorerMobile} is null) or (${table.scorerName} is not null and ${table.scorerMobile} ~ ${sql.raw(`'${SCORER_MOBILE_PATTERN}'`)})`,
+        ),
+        check(
+            "matches_toss_valid",
+            sql`(${table.tossWinnerTeamId} is null and ${table.tossDecision} is null) or (${table.tossWinnerTeamId} in (${table.teamAId}, ${table.teamBId}) and ${table.tossDecision} in (${sql.join(TOSS_DECISIONS.map((decision) => sql.raw(`'${decision}'`)), sql`, `)}))`,
         ),
         check("matches_stage_valid", sql`${table.stage} is null or ${table.stage} in (${sql.join(MATCH_STAGES.map((stage) => sql.raw(`'${stage}'`)), sql`, `)})`),
     ],

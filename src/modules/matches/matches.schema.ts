@@ -2,6 +2,7 @@ import { z } from "zod"
 import { isRealDate } from "../../shared/utils/date.js"
 import {
     INVALID_STAGE,
+    INVALID_TOSS_DECISION,
     MATCH_STAGES,
     NOTES_MAX_LENGTH,
     SAME_TEAM,
@@ -10,6 +11,7 @@ import {
     SCORER_NAME_MAX_LENGTH,
     SCORER_NAME_MIN_LENGTH,
     SCORER_PIN_LENGTH,
+    TOSS_DECISIONS,
 } from "./matches.constants.js"
 
 const teamId = (label: string) =>
@@ -55,6 +57,11 @@ export const addScorerSchema = z.object({
         .regex(new RegExp(SCORER_MOBILE_PATTERN), "Enter a valid 10-digit Indian mobile number"),
 })
 
+export const setTossSchema = z.object({
+    winnerTeamId: teamId("Toss winner"),
+    decision: z.enum(TOSS_DECISIONS, { error: INVALID_TOSS_DECISION }),
+})
+
 export const createMatchSchema = z
     .object({
         teamAId: teamId("Team A"),
@@ -78,4 +85,5 @@ export type CreateMatchInput = z.infer<typeof createMatchSchema>
 export type RescheduleMatchInput = z.infer<typeof rescheduleMatchSchema>
 export type AddScorerInput = z.infer<typeof addScorerSchema>
 export type ScorerLoginInput = z.infer<typeof scorerLoginSchema>
+export type SetTossInput = z.infer<typeof setTossSchema>
 export type MatchIdParams = z.infer<typeof matchIdParamsSchema>
