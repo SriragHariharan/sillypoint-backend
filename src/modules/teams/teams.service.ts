@@ -1,10 +1,21 @@
 import { db } from "../../db/postgres.js"
+import { oversText } from "../../engines/scoring/delivery-math.js"
+import { BALLS_PER_OVER } from "../../shared/constants/scoring.js"
 import { BadRequestError, NotFoundError } from "../../shared/http/errors.js"
 import { deleteImage, uploadImage, type UploadedImage } from "../../shared/storage/cloudinary.js"
 import { getMe } from "../auth/auth.service.js"
 import { LOGO_FOLDER, NOTHING_TO_UPDATE, TEAM_NOT_FOUND } from "./teams.constants.js"
-import { findManagedTeamIds, findTeamByManager, findTeamForUpdate, insertTeam, listTeamsByManager, updateTeam } from "./teams.repository.js"
-import { type CreateTeamInput, type UpdateTeamInput } from "./teams.schema.js"
+import {
+    findManagedTeamIds,
+    findTeamByManager,
+    findTeamForUpdate,
+    insertTeam,
+    listTeamMatches,
+    listTeamsByManager,
+    summariseTeamMatches,
+    updateTeam,
+} from "./teams.repository.js"
+import { type CreateTeamInput, type TeamMatchesQuery, type UpdateTeamInput } from "./teams.schema.js"
 
 // Create a team. The manager is the logged in user, so only a real, active user can manage a team.
 export const createTeam = async (managerId: number, input: CreateTeamInput, logoFile?: Express.Multer.File) => {
@@ -81,5 +92,50 @@ export const updateMyTeam = async (managerId: number, id: number, input: UpdateT
         // The change was not saved, so do not leave the new image behind
         if (logo) await deleteImage(logo.publicId)
         throw err
+    }
+}
+
+type HistoryRow = Awaited<ReturnType<typeof listTeamMatches>>["rows"][number]
+
+// A side's score once it has batted, otherwise nothing
+const scoreOf = (runs: number | null, wickets: number | null, balls: number | null) =>
+    runs === null || wickets === null || balls === null ? null : { runs, wickets, overs: oversText(balls, BALLS_PER_OVER) }
+
+// Where the match stands: finished, cancelled with its tournament, being scored, or not started
+const stateOf = (row: HistoryRow) => {
+    if (row.completedAt) return "completed"
+    if (row.tournament.cancelledAt) return "cancelled"
+    return row.scoringStartedAt ? "live" : "upcoming"
+}
+
+// How the match went for this team
+const resultFor = (row: HistoryRow, teamId: number) => {
+    if (row.resultType === "tie") return "tied"
+    if (row.resultType === "win") return row.winnerTeamId === teamId ? "won" : "lost"
+    return null
+}
+
+// The matches one of the manager's teams plays in, newest first, with each side's score and a summary of all of them
+export const listTeamHistory = async (managerId: number, teamId: number, query: TeamMatchesQuery) => {
+    await getMyTeam(managerId, teamId)
+
+    const [{ rows, total }, summary] = await Promise.all([listTeamMatches(teamId, query), summariseTeamMatches(teamId)])
+
+    return {
+        summary,
+        matches: rows.map((row) => ({
+            id: row.id,
+            scheduledAt: row.scheduledAt,
+            stage: row.stage,
+            state: stateOf(row),
+            result: resultFor(row, teamId),
+            resultSummary: row.resultSummary,
+            tournament: { id: row.tournament.id, name: row.tournament.name },
+            teamA: { ...row.teamA, score: scoreOf(row.runsA, row.wicketsA, row.ballsA) },
+            teamB: { ...row.teamB, score: scoreOf(row.runsB, row.wicketsB, row.ballsB) },
+        })),
+        page: query.page,
+        limit: query.limit,
+        total,
     }
 }

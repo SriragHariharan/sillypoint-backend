@@ -3,8 +3,8 @@ import { authenticate } from "../../shared/middleware/authenticate.js"
 import { imageUpload } from "../../shared/middleware/upload.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { LOGO_FIELD } from "./teams.constants.js"
-import { create, details, list, update } from "./teams.controller.js"
-import { createTeamSchema, teamIdParamsSchema, updateTeamSchema } from "./teams.schema.js"
+import { create, details, history, list, update } from "./teams.controller.js"
+import { createTeamSchema, teamIdParamsSchema, teamMatchesQuerySchema, updateTeamSchema } from "./teams.schema.js"
 
 const router = Router()
 
@@ -19,6 +19,9 @@ router.get("/", list)
 
 // GET /api/teams/:id: one of the user's own teams
 router.get("/:id", validate(teamIdParamsSchema, "params"), details)
+
+// GET /api/teams/:id/matches: the matches one of the user's own teams plays in (optional status, page, limit)
+router.get("/:id/matches", validate(teamIdParamsSchema, "params"), validate(teamMatchesQuerySchema, "query"), history)
 
 // PATCH /api/teams/:id: update one of the user's own teams
 router.patch("/:id", validate(teamIdParamsSchema, "params"), imageUpload(LOGO_FIELD), validate(updateTeamSchema), update)

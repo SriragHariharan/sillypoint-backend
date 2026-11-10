@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express"
 import { success } from "../../shared/http/response.js"
-import { type CreateTeamInput, type TeamIdParams, type UpdateTeamInput } from "./teams.schema.js"
+import { type CreateTeamInput, type TeamIdParams, type TeamMatchesQuery, type UpdateTeamInput } from "./teams.schema.js"
 import * as teamService from "./teams.service.js"
 
 // Create a team managed by the logged in user
@@ -27,4 +27,11 @@ export const update = async (req: Request, res: Response) => {
     const { id } = res.locals.params as TeamIdParams
     const team = await teamService.updateMyTeam(res.locals.userId as number, id, req.body as UpdateTeamInput, req.file)
     return success(res, team)
+}
+
+// The matches one of the logged in user's teams plays in
+export const history = async (_req: Request, res: Response) => {
+    const { id } = res.locals.params as TeamIdParams
+    const query = res.locals.query as TeamMatchesQuery
+    return success(res, await teamService.listTeamHistory(res.locals.userId as number, id, query))
 }

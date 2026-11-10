@@ -1,5 +1,13 @@
 import { z } from "zod"
-import { CAPTAIN_NAME_MAX_LENGTH, MOBILE_REGEX, NAME_MAX_LENGTH, NAME_MIN_LENGTH } from "./teams.constants.js"
+import {
+    CAPTAIN_NAME_MAX_LENGTH,
+    MOBILE_REGEX,
+    NAME_MAX_LENGTH,
+    NAME_MIN_LENGTH,
+    TEAM_MATCH_STATUSES,
+    TEAM_MATCHES_DEFAULT_LIMIT,
+    TEAM_MATCHES_MAX_LIMIT,
+} from "./teams.constants.js"
 
 const name = z
     .string({ error: "Team name is required" })
@@ -36,6 +44,19 @@ export const teamIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid team id" }).int().positive("Invalid team id"),
 })
 
+// History query: every filter is optional
+export const teamMatchesQuerySchema = z.object({
+    status: z.enum(TEAM_MATCH_STATUSES, { error: "Invalid status" }).optional(),
+    page: z.coerce.number({ error: "Invalid page" }).int().min(1, "Invalid page").default(1),
+    limit: z.coerce
+        .number({ error: "Invalid limit" })
+        .int()
+        .min(1, "Invalid limit")
+        .max(TEAM_MATCHES_MAX_LIMIT, `limit must be at most ${TEAM_MATCHES_MAX_LIMIT}`)
+        .default(TEAM_MATCHES_DEFAULT_LIMIT),
+})
+
 export type CreateTeamInput = z.infer<typeof createTeamSchema>
 export type UpdateTeamInput = z.infer<typeof updateTeamSchema>
 export type TeamIdParams = z.infer<typeof teamIdParamsSchema>
+export type TeamMatchesQuery = z.infer<typeof teamMatchesQuerySchema>
