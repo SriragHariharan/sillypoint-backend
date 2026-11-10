@@ -7,6 +7,7 @@ export type PlayerRow = typeof matchPlayers.$inferInsert
 export const findMatchPlayers = (matchId: number) =>
     db
         .select({
+            id: matchPlayers.id,
             teamId: matchPlayers.teamId,
             squad: matchPlayers.squad,
             position: matchPlayers.position,

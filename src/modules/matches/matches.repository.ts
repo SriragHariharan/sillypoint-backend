@@ -23,6 +23,13 @@ const matchColumns = {
     tossDecision: matches.tossDecision,
     // Overs each side bats; null until the scorer sets it
     oversPerSide: matches.oversPerSide,
+    // Set once scoring starts; from then on the toss, overs and players are locked
+    scoringStartedAt: matches.scoringStartedAt,
+    // The result, set when the second innings is over
+    completedAt: matches.completedAt,
+    resultType: matches.resultType,
+    winnerTeamId: matches.winnerTeamId,
+    resultSummary: matches.resultSummary,
     createdAt: matches.createdAt,
     teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
     teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },

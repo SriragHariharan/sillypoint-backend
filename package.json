@@ -25,7 +25,8 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "check:scoring": "tsx scripts/scoring-scenarios.ts"
   },
   "dependencies": {
     "argon2": "^0.45.1",

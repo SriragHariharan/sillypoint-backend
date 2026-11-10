@@ -7,6 +7,7 @@ import {
     TooManyRequestsError,
     UnauthorizedError,
 } from "../../shared/http/errors.js"
+import { SCORING_STARTED_LOCKED } from "../../shared/constants/scoring.js"
 import { signScorerToken } from "../../shared/utils/jwt.js"
 import { areTeamsEnrolled, getTournament } from "../tournaments/tournaments.service.js"
 import { NOT_ORGANIZER } from "../tournaments/tournaments.constants.js"
@@ -249,6 +250,7 @@ export const assertScoringOpen = async (matchId: number) => {
 // Record or change which team won the toss and what it chose
 export const setToss = async (matchId: number, input: SetTossInput) => {
     const match = await assertScoringOpen(matchId)
+    if (match.scoringStartedAt) throw new ConflictError(SCORING_STARTED_LOCKED)
     if (input.winnerTeamId !== match.teamA.id && input.winnerTeamId !== match.teamB.id) {
         throw new BadRequestError(TOSS_TEAM_NOT_IN_MATCH)
     }
@@ -261,7 +263,8 @@ export const setToss = async (matchId: number, input: SetTossInput) => {
 
 // Record or change the overs each side bats
 export const setOvers = async (matchId: number, input: SetOversInput) => {
-    await assertScoringOpen(matchId)
+    const match = await assertScoringOpen(matchId)
+    if (match.scoringStartedAt) throw new ConflictError(SCORING_STARTED_LOCKED)
 
     const updated = await setMatchOvers(matchId, input.oversPerSide)
     if (!updated) throw new NotFoundError(MATCH_NOT_FOUND)

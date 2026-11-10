@@ -2,6 +2,7 @@ import { Router } from "express"
 import authRoutes from "./modules/auth/auth.routes.js"
 import healthRoutes from "./modules/health/health.routes.js"
 import matchRoutes, { matchRouter, scorerRouter } from "./modules/matches/matches.routes.js"
+import scoringRoutes, { scorecardRouter } from "./modules/scoring/scoring.routes.js"
 import squadRoutes from "./modules/squads/squads.routes.js"
 import teamRoutes from "./modules/teams/teams.routes.js"
 import tournamentRoutes from "./modules/tournaments/tournaments.routes.js"
@@ -15,8 +16,10 @@ router.use("/api/teams", teamRoutes)
 router.use("/api/tournaments", tournamentRoutes)
 router.use("/api/tournaments", matchRoutes)
 router.use("/api/matches", matchRouter)
+router.use("/api/matches", scorecardRouter)
 router.use("/api/scorer", scorerRouter)
 router.use("/api/scorer", squadRoutes)
+router.use("/api/scorer", scoringRoutes)
 router.use("/api/users", userRoutes)
 
 export default router

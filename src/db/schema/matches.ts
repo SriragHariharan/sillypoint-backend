@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core"
 
+import { RESULT_SUMMARY_MAX_LENGTH, RESULT_TYPE_MAX_LENGTH, RESULT_TYPES } from "../../shared/constants/scoring.js"
 import {
     MATCH_STAGES,
     MAX_OVERS_PER_SIDE,
@@ -51,6 +52,13 @@ export const matches = pgTable(
         tossDecision: varchar("toss_decision", { length: TOSS_DECISION_MAX_LENGTH }),
         // Overs each side bats; null until the scorer sets it
         oversPerSide: integer("overs_per_side"),
+        // Set when the first innings starts; from then on the toss, overs and players are locked
+        scoringStartedAt: timestamp("scoring_started_at", { withTimezone: true }),
+        // The result, set together when the second innings is over: a win (with the winner), a tie or no result
+        completedAt: timestamp("completed_at", { withTimezone: true }),
+        resultType: varchar("result_type", { length: RESULT_TYPE_MAX_LENGTH }),
+        winnerTeamId: integer("winner_team_id").references(() => teams.id, { onDelete: "restrict" }),
+        resultSummary: varchar("result_summary", { length: RESULT_SUMMARY_MAX_LENGTH }),
         createdBy: integer("created_by")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
@@ -76,6 +84,10 @@ export const matches = pgTable(
         check(
             "matches_overs_valid",
             sql`${table.oversPerSide} is null or ${table.oversPerSide} between ${sql.raw(String(MIN_OVERS_PER_SIDE))} and ${sql.raw(String(MAX_OVERS_PER_SIDE))}`,
+        ),
+        check(
+            "matches_result_valid",
+            sql`(${table.completedAt} is null and ${table.resultType} is null and ${table.winnerTeamId} is null and ${table.resultSummary} is null) or (${table.completedAt} is not null and ${table.scoringStartedAt} is not null and ${table.resultSummary} is not null and ${table.resultType} in (${sql.join(RESULT_TYPES.map((type) => sql.raw(`'${type}'`)), sql`, `)}) and ((${table.resultType} = 'win' and ${table.winnerTeamId} in (${table.teamAId}, ${table.teamBId})) or (${table.resultType} <> 'win' and ${table.winnerTeamId} is null)))`,
         ),
         check("matches_stage_valid", sql`${table.stage} is null or ${table.stage} in (${sql.join(MATCH_STAGES.map((stage) => sql.raw(`'${stage}'`)), sql`, `)})`),
     ],

@@ -1,4 +1,5 @@
-import { BadRequestError } from "../../shared/http/errors.js"
+import { SCORING_STARTED_LOCKED } from "../../shared/constants/scoring.js"
+import { BadRequestError, ConflictError } from "../../shared/http/errors.js"
 import { assertScoringOpen } from "../matches/matches.service.js"
 import { TOO_MANY_PLAYERS } from "./squads.constants.js"
 import { type PlayerRow, findMatchPlayers, replaceMatchPlayers } from "./squads.repository.js"
@@ -11,7 +12,7 @@ type Squad = Awaited<ReturnType<typeof findMatchPlayers>>
 const teamSquad = (team: Team, rows: Squad) => {
     const mine = rows.filter((row) => row.teamId === team.id)
     const pick = (squad: string) =>
-        mine.filter((row) => row.squad === squad).map(({ name }) => ({ name }))
+        mine.filter((row) => row.squad === squad).map(({ id, name }) => ({ id, name }))
     return { team, playing: pick("playing"), substitutes: pick("substitute") }
 }
 
@@ -26,9 +27,15 @@ export const getSquads = async (matchId: number) => {
     return squadsOf(match.teamA, match.teamB, await findMatchPlayers(matchId))
 }
 
+// Every player of a match with their id, team and squad (for scoring and scorecards)
+export const getMatchPlayers = (matchId: number) => findMatchPlayers(matchId)
+
 // Save both teams' players (replaces what was there); the array order is the position
 export const saveSquads = async (matchId: number, input: SaveSquadsInput) => {
     const match = await assertScoringOpen(matchId)
+
+    // Balls recorded for a match point at these players, so they cannot be replaced once scoring has started
+    if (match.scoringStartedAt) throw new ConflictError(SCORING_STARTED_LOCKED)
 
     // The tournament decides how many players and substitutes a team may name
     const { playersPerSide, substitutesPerSide } = match.tournament
