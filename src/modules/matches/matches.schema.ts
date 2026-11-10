@@ -1,9 +1,12 @@
 import { z } from "zod"
 import { isRealDate } from "../../shared/utils/date.js"
 import {
+    INVALID_OVERS,
     INVALID_STAGE,
     INVALID_TOSS_DECISION,
     MATCH_STAGES,
+    MAX_OVERS_PER_SIDE,
+    MIN_OVERS_PER_SIDE,
     NOTES_MAX_LENGTH,
     SAME_TEAM,
     SCORER_LINK_TOKEN_MAX_LENGTH,
@@ -62,6 +65,14 @@ export const setTossSchema = z.object({
     decision: z.enum(TOSS_DECISIONS, { error: INVALID_TOSS_DECISION }),
 })
 
+export const setOversSchema = z.object({
+    oversPerSide: z
+        .number({ error: INVALID_OVERS })
+        .int(INVALID_OVERS)
+        .min(MIN_OVERS_PER_SIDE, INVALID_OVERS)
+        .max(MAX_OVERS_PER_SIDE, INVALID_OVERS),
+})
+
 export const createMatchSchema = z
     .object({
         teamAId: teamId("Team A"),
@@ -86,4 +97,5 @@ export type RescheduleMatchInput = z.infer<typeof rescheduleMatchSchema>
 export type AddScorerInput = z.infer<typeof addScorerSchema>
 export type ScorerLoginInput = z.infer<typeof scorerLoginSchema>
 export type SetTossInput = z.infer<typeof setTossSchema>
+export type SetOversInput = z.infer<typeof setOversSchema>
 export type MatchIdParams = z.infer<typeof matchIdParamsSchema>

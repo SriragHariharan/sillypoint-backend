@@ -1,13 +1,14 @@
 import { type Request, type Response } from "express"
 import { success } from "../../shared/http/response.js"
 import { type TournamentIdParams } from "../tournaments/tournaments.schema.js"
-import { MATCH_CREATED, MATCH_RESCHEDULED, SCORER_ADDED, TOSS_SAVED } from "./matches.constants.js"
+import { MATCH_CREATED, MATCH_RESCHEDULED, OVERS_SAVED, SCORER_ADDED, TOSS_SAVED } from "./matches.constants.js"
 import {
     type AddScorerInput,
     type CreateMatchInput,
     type MatchIdParams,
     type RescheduleMatchInput,
     type ScorerLoginInput,
+    type SetOversInput,
     type SetTossInput,
 } from "./matches.schema.js"
 import * as matchService from "./matches.service.js"
@@ -64,6 +65,12 @@ export const scorerLogin = async (req: Request, res: Response) => {
 export const scorerToss = async (req: Request, res: Response) => {
     const match = await matchService.setToss(res.locals.matchId as number, req.body as SetTossInput)
     return success(res, { message: TOSS_SAVED, match })
+}
+
+// Record or change the overs per side (scorer token)
+export const scorerOvers = async (req: Request, res: Response) => {
+    const match = await matchService.setOvers(res.locals.matchId as number, req.body as SetOversInput)
+    return success(res, { message: OVERS_SAVED, match })
 }
 
 // The logged-in scorer's session again, so a page refresh keeps them logged in (scorer token)

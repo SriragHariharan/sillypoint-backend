@@ -1,0 +1,2 @@
+ALTER TABLE "matches" ADD COLUMN "overs_per_side" integer;--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_overs_valid" CHECK ("matches"."overs_per_side" is null or "matches"."overs_per_side" between 1 and 50);

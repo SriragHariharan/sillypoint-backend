@@ -12,6 +12,7 @@ import {
     scorerAccess,
     scorerLogin,
     scorerMe,
+    scorerOvers,
     scorerToss,
 } from "./matches.controller.js"
 import {
@@ -20,6 +21,7 @@ import {
     matchIdParamsSchema,
     rescheduleMatchSchema,
     scorerLoginSchema,
+    setOversSchema,
     setTossSchema,
 } from "./matches.schema.js"
 
@@ -63,5 +65,8 @@ scorerRouter.get("/me", authenticateScorer, scorerMe)
 
 // PUT /api/scorer/toss: scorer token, once scoring has opened; records or changes the toss
 scorerRouter.put("/toss", authenticateScorer, validate(setTossSchema), scorerToss)
+
+// PUT /api/scorer/overs: scorer token, once scoring has opened; records or changes the overs per side
+scorerRouter.put("/overs", authenticateScorer, validate(setOversSchema), scorerOvers)
 
 export default router

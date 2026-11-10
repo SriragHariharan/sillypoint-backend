@@ -3,6 +3,8 @@ import { check, index, integer, pgTable, text, timestamp, varchar } from "drizzl
 
 import {
     MATCH_STAGES,
+    MAX_OVERS_PER_SIDE,
+    MIN_OVERS_PER_SIDE,
     SCORER_LINK_TOKEN_MAX_LENGTH,
     SCORER_MOBILE_PATTERN,
     SCORER_NAME_MAX_LENGTH,
@@ -47,6 +49,8 @@ export const matches = pgTable(
         // The toss: the winning team (one of the two teams) and what it chose; both are set together
         tossWinnerTeamId: integer("toss_winner_team_id").references(() => teams.id, { onDelete: "restrict" }),
         tossDecision: varchar("toss_decision", { length: TOSS_DECISION_MAX_LENGTH }),
+        // Overs each side bats; null until the scorer sets it
+        oversPerSide: integer("overs_per_side"),
         createdBy: integer("created_by")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
@@ -68,6 +72,10 @@ export const matches = pgTable(
         check(
             "matches_toss_valid",
             sql`(${table.tossWinnerTeamId} is null and ${table.tossDecision} is null) or (${table.tossWinnerTeamId} in (${table.teamAId}, ${table.teamBId}) and ${table.tossDecision} in (${sql.join(TOSS_DECISIONS.map((decision) => sql.raw(`'${decision}'`)), sql`, `)}))`,
+        ),
+        check(
+            "matches_overs_valid",
+            sql`${table.oversPerSide} is null or ${table.oversPerSide} between ${sql.raw(String(MIN_OVERS_PER_SIDE))} and ${sql.raw(String(MAX_OVERS_PER_SIDE))}`,
         ),
         check("matches_stage_valid", sql`${table.stage} is null or ${table.stage} in (${sql.join(MATCH_STAGES.map((stage) => sql.raw(`'${stage}'`)), sql`, `)})`),
     ],

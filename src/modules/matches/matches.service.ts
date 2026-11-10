@@ -42,6 +42,7 @@ import {
     listTournamentMatches,
     recordScorerLoginFailure,
     type ScorerAccess,
+    setMatchOvers,
     setMatchScorer,
     setMatchToss,
     setScorerAccess,
@@ -52,6 +53,7 @@ import {
     type CreateMatchInput,
     type RescheduleMatchInput,
     type ScorerLoginInput,
+    type SetOversInput,
     type SetTossInput,
 } from "./matches.schema.js"
 
@@ -252,6 +254,16 @@ export const setToss = async (matchId: number, input: SetTossInput) => {
     }
 
     const updated = await setMatchToss(matchId, input.winnerTeamId, input.decision)
+    if (!updated) throw new NotFoundError(MATCH_NOT_FOUND)
+
+    return getMatch(matchId)
+}
+
+// Record or change the overs each side bats
+export const setOvers = async (matchId: number, input: SetOversInput) => {
+    await assertScoringOpen(matchId)
+
+    const updated = await setMatchOvers(matchId, input.oversPerSide)
     if (!updated) throw new NotFoundError(MATCH_NOT_FOUND)
 
     return getMatch(matchId)

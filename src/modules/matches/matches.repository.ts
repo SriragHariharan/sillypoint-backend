@@ -21,6 +21,8 @@ const matchColumns = {
     // Who won the toss and what they chose (bat or bowl); both null until the scorer records it
     tossWinnerTeamId: matches.tossWinnerTeamId,
     tossDecision: matches.tossDecision,
+    // Overs each side bats; null until the scorer sets it
+    oversPerSide: matches.oversPerSide,
     createdAt: matches.createdAt,
     teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
     teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },
@@ -64,6 +66,12 @@ export const setMatchToss = async (id: number, tossWinnerTeamId: number, tossDec
         .set({ tossWinnerTeamId, tossDecision })
         .where(eq(matches.id, id))
         .returning({ id: matches.id })
+    return row
+}
+
+// Record (or change) the overs per side. Returns nothing if the match is gone.
+export const setMatchOvers = async (id: number, oversPerSide: number) => {
+    const [row] = await db.update(matches).set({ oversPerSide }).where(eq(matches.id, id)).returning({ id: matches.id })
     return row
 }
 

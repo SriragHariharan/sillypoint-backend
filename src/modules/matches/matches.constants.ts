@@ -49,3 +49,9 @@ export const TOSS_DECISION_MAX_LENGTH = 4
 export const INVALID_TOSS_DECISION = "Choose batting or bowling"
 export const TOSS_TEAM_NOT_IN_MATCH = "The toss winner must be one of the two teams of this match"
 export const TOSS_SAVED = "Toss saved"
+
+// Overs each side bats in the match (whole overs), set by the scorer
+export const MIN_OVERS_PER_SIDE = 1
+export const MAX_OVERS_PER_SIDE = 50
+export const INVALID_OVERS = `Overs per side must be a whole number between ${MIN_OVERS_PER_SIDE} and ${MAX_OVERS_PER_SIDE}`
+export const OVERS_SAVED = "Overs saved"
