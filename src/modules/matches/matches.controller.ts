@@ -1,9 +1,8 @@
 import { type Request, type Response } from "express"
 import { success } from "../../shared/http/response.js"
 import { type TournamentIdParams } from "../tournaments/tournaments.schema.js"
-import { MATCH_CREATED, MATCH_RESCHEDULED, OVERS_SAVED, SCORER_ADDED, TOSS_SAVED } from "./matches.constants.js"
+import { MATCH_CREATED, MATCH_RESCHEDULED, OVERS_SAVED, TOSS_SAVED } from "./matches.constants.js"
 import {
-    type AddScorerInput,
     type CreateMatchInput,
     type MatchIdParams,
     type RescheduleMatchInput,
@@ -41,13 +40,6 @@ export const reschedule = async (req: Request, res: Response) => {
     return success(res, { message: MATCH_RESCHEDULED, match })
 }
 
-// Assign the match's scorer (organizer only)
-export const addScorer = async (req: Request, res: Response) => {
-    const { id } = res.locals.params as MatchIdParams
-    const match = await matchService.addScorer(res.locals.userId as number, id, req.body as AddScorerInput)
-    return success(res, { message: SCORER_ADDED, match }, 201)
-}
-
 // The scorer's login link token and PIN (organizer only)
 export const scorerAccess = async (_req: Request, res: Response) => {
     const { id } = res.locals.params as MatchIdParams
@@ -55,7 +47,7 @@ export const scorerAccess = async (_req: Request, res: Response) => {
     return success(res, access)
 }
 
-// Log a scorer in with the match link, mobile and PIN (public)
+// Log a scorer in with the match link and PIN (public)
 export const scorerLogin = async (req: Request, res: Response) => {
     const session = await matchService.scorerLogin(req.body as ScorerLoginInput)
     return success(res, session)

@@ -4,7 +4,6 @@ import { authenticateScorer } from "../../shared/middleware/authenticate-scorer.
 import { validate } from "../../shared/middleware/validate.js"
 import { tournamentIdParamsSchema } from "../tournaments/tournaments.schema.js"
 import {
-    addScorer,
     create,
     details,
     list,
@@ -16,7 +15,6 @@ import {
     scorerToss,
 } from "./matches.controller.js"
 import {
-    addScorerSchema,
     createMatchSchema,
     matchIdParamsSchema,
     rescheduleMatchSchema,
@@ -48,16 +46,13 @@ matchRouter.patch(
     reschedule,
 )
 
-// POST /api/matches/:id/scorer: organizer only, one scorer per match
-matchRouter.post("/:id/scorer", authenticate, validate(matchIdParamsSchema, "params"), validate(addScorerSchema), addScorer)
-
 // GET /api/matches/:id/scorer/access: organizer only, the scorer's login link token and PIN
 matchRouter.get("/:id/scorer/access", authenticate, validate(matchIdParamsSchema, "params"), scorerAccess)
 
 // Routes mounted at /api/scorer
 export const scorerRouter = Router()
 
-// POST /api/scorer/login: public, the scorer proves themselves with the link token, mobile and PIN
+// POST /api/scorer/login: public, the scorer proves themselves with the link token and PIN
 scorerRouter.post("/login", validate(scorerLoginSchema), scorerLogin)
 
 // GET /api/scorer/me: scorer token only, the session behind it (also tells when scoring opens)

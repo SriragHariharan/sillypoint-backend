@@ -7,8 +7,6 @@ import {
     MAX_OVERS_PER_SIDE,
     MIN_OVERS_PER_SIDE,
     SCORER_LINK_TOKEN_MAX_LENGTH,
-    SCORER_MOBILE_PATTERN,
-    SCORER_NAME_MAX_LENGTH,
     SCORER_PIN_LENGTH,
     STAGE_MAX_LENGTH,
     TOSS_DECISION_MAX_LENGTH,
@@ -38,13 +36,11 @@ export const matches = pgTable(
         stage: varchar("stage", { length: STAGE_MAX_LENGTH }),
         // Optional organizer note about the match
         notes: text("notes"),
-        // The match's scorer (one per match); both are set together. Not a user account yet.
-        scorerName: varchar("scorer_name", { length: SCORER_NAME_MAX_LENGTH }),
-        scorerMobile: varchar("scorer_mobile", { length: 10 }),
-        // Shareable login link (random token) and 6-digit PIN for the scorer; the organizer can view both
+        // The scorer's login, created together with the match: a shareable link (random token) and a 6-digit PIN.
+        // The PIN is kept as plain text on purpose so the organizer can always view it. No scorer name or account.
         scorerLinkToken: varchar("scorer_link_token", { length: SCORER_LINK_TOKEN_MAX_LENGTH }).unique(),
         scorerPin: varchar("scorer_pin", { length: SCORER_PIN_LENGTH }),
-        // Wrong mobile/PIN tries in a row; at the limit the scorer login is locked until scorer_locked_until
+        // Wrong PIN tries in a row; at the limit the scorer login is locked until scorer_locked_until
         scorerPinAttempts: integer("scorer_pin_attempts").notNull().default(0),
         scorerLockedUntil: timestamp("scorer_locked_until", { withTimezone: true }),
         // The toss: the winning team (one of the two teams) and what it chose; both are set together
@@ -73,10 +69,7 @@ export const matches = pgTable(
         index("matches_team_a_id_idx").on(table.teamAId),
         index("matches_team_b_id_idx").on(table.teamBId),
         check("matches_teams_differ", sql`${table.teamAId} <> ${table.teamBId}`),
-        check(
-            "matches_scorer_valid",
-            sql`(${table.scorerName} is null and ${table.scorerMobile} is null) or (${table.scorerName} is not null and ${table.scorerMobile} ~ ${sql.raw(`'${SCORER_MOBILE_PATTERN}'`)})`,
-        ),
+        check("matches_scorer_valid", sql`(${table.scorerLinkToken} is null) = (${table.scorerPin} is null)`),
         check(
             "matches_toss_valid",
             sql`(${table.tossWinnerTeamId} is null and ${table.tossDecision} is null) or (${table.tossWinnerTeamId} in (${table.teamAId}, ${table.teamBId}) and ${table.tossDecision} in (${sql.join(TOSS_DECISIONS.map((decision) => sql.raw(`'${decision}'`)), sql`, `)}))`,

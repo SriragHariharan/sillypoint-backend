@@ -16,8 +16,6 @@ const matchColumns = {
     scheduledAt: matches.scheduledAt,
     stage: matches.stage,
     notes: matches.notes,
-    // The scorer's mobile is stored but never sent to the client
-    scorerName: matches.scorerName,
     // Who won the toss and what they chose (bat or bowl); both null until the scorer records it
     tossWinnerTeamId: matches.tossWinnerTeamId,
     tossDecision: matches.tossDecision,
@@ -43,6 +41,9 @@ export const insertMatch = async (row: {
     stage: string | null
     notes: string | null
     createdBy: number
+    // The scorer's login, created with the match
+    scorerLinkToken: string
+    scorerPin: string
 }) => {
     const [inserted] = await db.insert(matches).values(row).returning({ id: matches.id })
     return inserted
@@ -82,20 +83,10 @@ export const setMatchOvers = async (id: number, oversPerSide: number) => {
     return row
 }
 
-// Set the scorer only if the match has none yet (atomic, so two requests cannot both win). Returns nothing if one is already set.
-export const setMatchScorer = async (id: number, scorerName: string, scorerMobile: string, access: ScorerAccess) => {
-    const [row] = await db
-        .update(matches)
-        .set({ scorerName, scorerMobile, scorerLinkToken: access.linkToken, scorerPin: access.pin })
-        .where(and(eq(matches.id, id), isNull(matches.scorerMobile)))
-        .returning({ id: matches.id })
-    return row
-}
-
-// The scorer and their login link/PIN (for the organizer only; never part of the public match columns)
+// The scorer's login link and PIN (for the organizer only; never part of the public match columns)
 export const findScorerAccess = async (id: number) => {
     const [row] = await db
-        .select({ scorerName: matches.scorerName, linkToken: matches.scorerLinkToken, pin: matches.scorerPin })
+        .select({ linkToken: matches.scorerLinkToken, pin: matches.scorerPin })
         .from(matches)
         .where(eq(matches.id, id))
         .limit(1)
@@ -112,14 +103,12 @@ export const setScorerAccess = async (id: number, access: ScorerAccess) => {
     return row
 }
 
-// The match a login link belongs to, with what is needed to check the mobile and PIN
+// The match a login link belongs to, with what is needed to check the PIN
 export const findScorerLogin = async (linkToken: string) => {
     const [row] = await db
         .select({
             id: matches.id,
             tournamentId: matches.tournamentId,
-            scorerName: matches.scorerName,
-            mobile: matches.scorerMobile,
             pin: matches.scorerPin,
             lockedUntil: matches.scorerLockedUntil,
         })

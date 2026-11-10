@@ -17,8 +17,6 @@ import {
     MATCH_IN_PAST,
     MATCH_NOT_FOUND,
     MATCH_TIMEZONE_OFFSET,
-    NO_SCORER,
-    SCORER_ALREADY_ADDED,
     SCORER_INVALID_LOGIN,
     SCORING_NOT_OPEN,
     SCORING_OPENS_BEFORE_MS,
@@ -31,7 +29,6 @@ import {
     TOSS_TEAM_NOT_IN_MATCH,
     TOURNAMENT_NOT_OPEN,
     TOURNAMENT_NOT_OPEN_FOR_RESCHEDULE,
-    TOURNAMENT_NOT_OPEN_FOR_SCORER,
     TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN,
 } from "./matches.constants.js"
 import {
@@ -44,13 +41,11 @@ import {
     recordScorerLoginFailure,
     type ScorerAccess,
     setMatchOvers,
-    setMatchScorer,
     setMatchToss,
     setScorerAccess,
     updateMatchSchedule,
 } from "./matches.repository.js"
 import {
-    type AddScorerInput,
     type CreateMatchInput,
     type RescheduleMatchInput,
     type ScorerLoginInput,
@@ -76,6 +71,7 @@ export const createMatch = async (userId: number, tournamentId: number, input: C
     const enrolled = await areTeamsEnrolled(tournamentId, [input.teamAId, input.teamBId])
     if (!enrolled) throw new BadRequestError(TEAM_NOT_IN_TOURNAMENT)
 
+    const access = newScorerAccess()
     const created = await insertMatch({
         tournamentId,
         teamAId: input.teamAId,
@@ -84,6 +80,9 @@ export const createMatch = async (userId: number, tournamentId: number, input: C
         stage: input.stage ?? null,
         notes: input.notes ?? null,
         createdBy: userId,
+        // Every match gets its scorer login (link + PIN) when it is created
+        scorerLinkToken: access.linkToken,
+        scorerPin: access.pin,
     })
     if (!created) throw new Error("Failed to create match")
 
@@ -147,21 +146,6 @@ export const rescheduleMatch = async (userId: number, id: number, input: Resched
     return getMatch(id)
 }
 
-// Assign the match's one scorer. Only the tournament's organizer can, while the tournament is open.
-export const addScorer = async (userId: number, id: number, input: AddScorerInput) => {
-    const { tournament } = await matchWithTournament(id)
-
-    if (tournament.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (tournament.status === "cancelled" || tournament.status === "completed") {
-        throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER)
-    }
-
-    const updated = await setMatchScorer(id, input.name, input.mobile, newScorerAccess())
-    if (!updated) throw new ConflictError(SCORER_ALREADY_ADDED)
-
-    return getMatch(id)
-}
-
 // A new random login link token and a 6-digit PIN like 004217
 const newScorerAccess = (): ScorerAccess => ({
     linkToken: randomBytes(SCORER_LINK_TOKEN_BYTES).toString("base64url"),
@@ -177,13 +161,13 @@ const sameText = (a: string, b: string) => {
     return left.length === right.length && timingSafeEqual(left, right)
 }
 
-// The scorer's login link token and PIN, for the organizer to share. A scorer added before links existed gets them now.
+// The scorer's login link token and PIN, for the organizer to share. A match created before links existed gets them now.
 export const getScorerAccess = async (userId: number, id: number): Promise<ScorerAccess> => {
     const { tournament } = await matchWithTournament(id)
     if (tournament.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
 
     const row = await findScorerAccess(id)
-    if (!row?.scorerName) throw new NotFoundError(NO_SCORER)
+    if (!row) throw new NotFoundError(MATCH_NOT_FOUND)
     if (row.linkToken && row.pin) return { linkToken: row.linkToken, pin: row.pin }
 
     const access = newScorerAccess()
@@ -191,21 +175,21 @@ export const getScorerAccess = async (userId: number, id: number): Promise<Score
 
     // Another request filled it first: use theirs
     const filled = await findScorerAccess(id)
-    if (!filled?.linkToken || !filled.pin) throw new NotFoundError(NO_SCORER)
+    if (!filled?.linkToken || !filled.pin) throw new NotFoundError(MATCH_NOT_FOUND)
     return { linkToken: filled.linkToken, pin: filled.pin }
 }
 
-// Log a scorer in with the match's link token, their mobile and the PIN. Wrong tries lock the login for a while.
+// Log a scorer in with the match's link token and the PIN. Wrong tries lock the login for a while.
 export const scorerLogin = async (input: ScorerLoginInput) => {
     const row = await findScorerLogin(input.token)
-    if (!row?.mobile || !row.pin) throw new UnauthorizedError(SCORER_INVALID_LOGIN)
+    if (!row?.pin) throw new UnauthorizedError(SCORER_INVALID_LOGIN)
 
     if (row.lockedUntil && row.lockedUntil > new Date()) {
         const minutes = Math.max(1, Math.ceil((row.lockedUntil.getTime() - Date.now()) / 60000))
         throw new TooManyRequestsError(`${SCORER_LOCKED} ${minutes} minutes`)
     }
 
-    if (!sameText(row.mobile, input.mobile) || !sameText(row.pin, input.pin)) {
+    if (!sameText(row.pin, input.pin)) {
         await recordScorerLoginFailure(row.id, new Date(Date.now() + SCORER_LOCK_MS))
         throw new UnauthorizedError(SCORER_INVALID_LOGIN)
     }
@@ -216,15 +200,13 @@ export const scorerLogin = async (input: ScorerLoginInput) => {
     return { accessToken: signScorerToken(row.id, SCORER_TOKEN_TTL_SECONDS), ...session }
 }
 
-// What the scorer's screen needs: who they are, the match, the server clock and when scoring opens
+// What the scorer's screen needs: the match, the server clock and when scoring opens
 const scorerSessionOf = ({ match, tournament }: Awaited<ReturnType<typeof matchWithTournament>>) => {
-    if (!match.scorerName) throw new UnauthorizedError(SCORER_INVALID_LOGIN)
     if (tournament.status === "cancelled" || tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN)
     }
 
     return {
-        scorer: { name: match.scorerName },
         match,
         serverTime: new Date().toISOString(),
         scoringOpensAt: scoringOpensAt(match.scheduledAt).toISOString(),

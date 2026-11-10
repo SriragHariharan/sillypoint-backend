@@ -10,9 +10,6 @@ import {
     NOTES_MAX_LENGTH,
     SAME_TEAM,
     SCORER_LINK_TOKEN_MAX_LENGTH,
-    SCORER_MOBILE_PATTERN,
-    SCORER_NAME_MAX_LENGTH,
-    SCORER_NAME_MIN_LENGTH,
     SCORER_PIN_LENGTH,
     TOSS_DECISIONS,
 } from "./matches.constants.js"
@@ -35,9 +32,6 @@ export const scorerLoginSchema = z.object({
         .regex(/^[A-Za-z0-9_-]+$/, "Link is invalid")
         .min(20, "Link is invalid")
         .max(SCORER_LINK_TOKEN_MAX_LENGTH, "Link is invalid"),
-    mobile: z
-        .string({ error: "Scorer mobile is required" })
-        .regex(new RegExp(SCORER_MOBILE_PATTERN), "Enter a valid 10-digit Indian mobile number"),
     pin: z
         .string({ error: "PIN is required" })
         .regex(new RegExp(`^[0-9]{${SCORER_PIN_LENGTH}}$`), `PIN must be ${SCORER_PIN_LENGTH} digits`),
@@ -48,17 +42,6 @@ export const matchIdParamsSchema = z.object({
 })
 
 export const rescheduleMatchSchema = z.object({ matchDate, matchTime })
-
-export const addScorerSchema = z.object({
-    name: z
-        .string({ error: "Scorer name is required" })
-        .trim()
-        .min(SCORER_NAME_MIN_LENGTH, `Scorer name must be at least ${SCORER_NAME_MIN_LENGTH} characters`)
-        .max(SCORER_NAME_MAX_LENGTH, `Scorer name must be at most ${SCORER_NAME_MAX_LENGTH} characters`),
-    mobile: z
-        .string({ error: "Scorer mobile is required" })
-        .regex(new RegExp(SCORER_MOBILE_PATTERN), "Enter a valid 10-digit Indian mobile number"),
-})
 
 export const setTossSchema = z.object({
     winnerTeamId: teamId("Toss winner"),
@@ -94,7 +77,6 @@ export const createMatchSchema = z
 
 export type CreateMatchInput = z.infer<typeof createMatchSchema>
 export type RescheduleMatchInput = z.infer<typeof rescheduleMatchSchema>
-export type AddScorerInput = z.infer<typeof addScorerSchema>
 export type ScorerLoginInput = z.infer<typeof scorerLoginSchema>
 export type SetTossInput = z.infer<typeof setTossSchema>
 export type SetOversInput = z.infer<typeof setOversSchema>
