@@ -27,7 +27,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "check:scoring": "tsx scripts/scoring-scenarios.ts",
-    "check:scorecard-cache": "tsx scripts/scorecard-cache.ts"
+    "check:scorecard-cache": "tsx scripts/scorecard-cache.ts",
+    "check:standings": "tsx scripts/standings-scenarios.ts"
   },
   "dependencies": {
     "argon2": "^0.45.1",

@@ -4,6 +4,7 @@ import healthRoutes from "./modules/health/health.routes.js"
 import matchRoutes, { matchRouter, scorerRouter } from "./modules/matches/matches.routes.js"
 import scoringRoutes, { scorecardRouter } from "./modules/scoring/scoring.routes.js"
 import squadRoutes from "./modules/squads/squads.routes.js"
+import standingsRoutes from "./modules/standings/standings.routes.js"
 import teamRoutes from "./modules/teams/teams.routes.js"
 import tournamentRoutes from "./modules/tournaments/tournaments.routes.js"
 import userRoutes from "./modules/users/users.routes.js"
@@ -15,6 +16,7 @@ router.use("/api/auth", authRoutes)
 router.use("/api/teams", teamRoutes)
 router.use("/api/tournaments", tournamentRoutes)
 router.use("/api/tournaments", matchRoutes)
+router.use("/api/tournaments", standingsRoutes)
 router.use("/api/matches", matchRouter)
 router.use("/api/matches", scorecardRouter)
 router.use("/api/scorer", scorerRouter)
