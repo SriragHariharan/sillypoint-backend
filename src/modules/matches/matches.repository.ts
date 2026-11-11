@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm"
+import { and, desc, eq, isNull, sql } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { db } from "../../db/postgres.js"
 import { matches, teams } from "../../db/schema/index.js"
@@ -130,4 +130,4 @@ export const clearScorerLoginFailures = async (id: number) => {
 
 // Matches of a tournament, earliest first
 export const listTournamentMatches = (tournamentId: number) =>
-    selectMatches().where(eq(matches.tournamentId, tournamentId)).orderBy(asc(matches.scheduledAt), asc(matches.id))
+    selectMatches().where(eq(matches.tournamentId, tournamentId)).orderBy(desc(matches.scheduledAt), desc(matches.id))
