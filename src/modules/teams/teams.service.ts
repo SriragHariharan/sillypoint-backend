@@ -114,7 +114,8 @@ const resultFor = (row: HistoryRow, teamId: number) => {
     return null
 }
 
-// The matches one of the manager's teams plays in, newest first, with each side's score and a summary of all of them
+// The matches one of the manager's teams plays in (upcoming soonest first, others newest first), with each side's
+// score and a summary of all of them
 export const listTeamHistory = async (managerId: number, teamId: number, query: TeamMatchesQuery) => {
     await getMyTeam(managerId, teamId)
 

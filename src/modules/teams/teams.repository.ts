@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { db } from "../../db/postgres.js"
 import { innings, matches, teams, tournaments } from "../../db/schema/index.js"
@@ -102,10 +102,17 @@ const stateCondition = (status: NonNullable<TeamMatchesQuery["status"]>) => {
             return and(isNull(matches.completedAt), isNotNull(matches.scoringStartedAt))
         case "upcoming":
             return and(isNull(matches.completedAt), isNull(matches.scoringStartedAt))
+        case "played":
+            return isNotNull(matches.scoringStartedAt)
     }
 }
 
-// A page of the matches this team plays in (newest first) with each side's score, and how many match in total
+// Upcoming matches come soonest first (the next match on top); everything else newest first
+const orderFor = (status: TeamMatchesQuery["status"]) =>
+    status === "upcoming" ? [asc(matches.scheduledAt), asc(matches.id)] : [desc(matches.scheduledAt), desc(matches.id)]
+
+// A page of the matches this team plays in (upcoming soonest first, others newest first) with each side's score,
+// and how many match in total
 export const listTeamMatches = async (teamId: number, query: TeamMatchesQuery) => {
     const where = and(playedBy(teamId), query.status ? stateCondition(query.status) : undefined)
 
@@ -143,7 +150,7 @@ export const listTeamMatches = async (teamId: number, query: TeamMatchesQuery) =
                 and(eq(inningsB.matchId, matches.id), eq(inningsB.battingTeamId, matches.teamBId), lte(inningsB.inningsNumber, REGULAR_INNINGS)),
             )
             .where(where)
-            .orderBy(desc(matches.scheduledAt), desc(matches.id))
+            .orderBy(...orderFor(query.status))
             .limit(query.limit)
             .offset((query.page - 1) * query.limit),
         db
