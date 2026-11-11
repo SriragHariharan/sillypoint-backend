@@ -1,0 +1,2 @@
+ALTER TABLE "matches" ADD COLUMN "concluded_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_concluded_valid" CHECK ("matches"."concluded_at" is null or "matches"."completed_at" is not null);

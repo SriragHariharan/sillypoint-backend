@@ -2,7 +2,7 @@ import { Router } from "express"
 import { authenticateScorer } from "../../shared/middleware/authenticate-scorer.js"
 import { validate } from "../../shared/middleware/validate.js"
 import { matchIdParamsSchema } from "../matches/matches.schema.js"
-import { ball, batter, bowler, end, retire, scorecard, start, state, swap, undo } from "./scoring.controller.js"
+import { ball, batter, bowler, conclude, end, retire, scorecard, start, state, swap, undo } from "./scoring.controller.js"
 import {
     chooseBatterSchema,
     chooseBowlerSchema,
@@ -21,6 +21,9 @@ router.get("/scoring", authenticateScorer, state)
 
 // POST /api/scorer/innings/start: opening batters and bowler of the first (or second) innings
 router.post("/innings/start", authenticateScorer, validate(startInningsSchema), start)
+
+// POST /api/scorer/conclude: confirm the finished match; the result is final and undo is no longer possible
+router.post("/conclude", authenticateScorer, conclude)
 
 // POST /api/scorer/innings/:n/deliveries: one ball. The ones below change the same innings the same way.
 const innings = Router({ mergeParams: true })
