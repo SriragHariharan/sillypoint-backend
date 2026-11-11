@@ -72,10 +72,10 @@ export const addTeams = async (req: Request, res: Response) => {
     return success(res, { message: TEAMS_ADDED, teams }, 201)
 }
 
-// Public list of the teams in a tournament
+// List of the teams in a tournament: public, but only its organizer also sees the manager mobiles
 export const listTeams = async (_req: Request, res: Response) => {
     const { id } = res.locals.params as TournamentIdParams
-    const teams = await tournamentService.listTeamsInTournament(id)
+    const teams = await tournamentService.listTeamsInTournament(id, res.locals.userId as number | undefined)
     return success(res, { teams })
 }
 

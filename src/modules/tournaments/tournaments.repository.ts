@@ -181,17 +181,30 @@ export const findEnrolledTeamIds = async (tx: Tx, tournamentId: number, teamIds:
 export const insertTournamentTeams = (tx: Tx, rows: { tournamentId: number; teamId: number; addedBy: number }[]) =>
     tx.insert(tournamentTeams).values(rows)
 
-// Teams in a tournament, in the order they were added
+// Same columns plus the manager mobile: only ever returned to the tournament's organizer
+const organizerTeamColumns = { ...enrolledTeamColumns, manager_mobile: teams.managerMobile }
+
+const enrolledTeamsWhere = (tournamentId: number, teamIds?: number[]) =>
+    teamIds
+        ? and(eq(tournamentTeams.tournamentId, tournamentId), inArray(tournamentTeams.teamId, teamIds))
+        : eq(tournamentTeams.tournamentId, tournamentId)
+
+// Teams in a tournament, in the order they were added (public columns)
 export const listTournamentTeams = (tournamentId: number, teamIds?: number[]) =>
     db
         .select(enrolledTeamColumns)
         .from(tournamentTeams)
         .innerJoin(teams, eq(teams.id, tournamentTeams.teamId))
-        .where(
-            teamIds
-                ? and(eq(tournamentTeams.tournamentId, tournamentId), inArray(tournamentTeams.teamId, teamIds))
-                : eq(tournamentTeams.tournamentId, tournamentId),
-        )
+        .where(enrolledTeamsWhere(tournamentId, teamIds))
+        .orderBy(asc(tournamentTeams.createdAt), asc(tournamentTeams.id))
+
+// The same list with each manager's mobile, for the organizer
+export const listTournamentTeamsForOrganizer = (tournamentId: number) =>
+    db
+        .select(organizerTeamColumns)
+        .from(tournamentTeams)
+        .innerJoin(teams, eq(teams.id, tournamentTeams.teamId))
+        .where(enrolledTeamsWhere(tournamentId))
         .orderBy(asc(tournamentTeams.createdAt), asc(tournamentTeams.id))
 
 // Lock one enrollment so two removals cannot race

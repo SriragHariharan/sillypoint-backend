@@ -35,6 +35,7 @@ import {
     insertTournament,
     insertTournamentTeams,
     listTournamentTeams,
+    listTournamentTeamsForOrganizer,
     listTournaments,
     markCancelled,
     markPrizeMoneyUpdated,
@@ -220,12 +221,14 @@ export const addTeamsToTournament = async (userId: number, tournamentId: number,
     return listTournamentTeams(tournamentId, teamIds)
 }
 
-// Public list of the teams in a tournament
-export const listTeamsInTournament = async (tournamentId: number) => {
+// List of the teams in a tournament. Public, but the manager mobiles go only to the tournament's organizer.
+export const listTeamsInTournament = async (tournamentId: number, viewerId?: number) => {
     const tournament = await findTournamentForCancel(tournamentId)
     if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
 
-    return listTournamentTeams(tournamentId)
+    return viewerId !== undefined && viewerId === tournament.organizerId
+        ? listTournamentTeamsForOrganizer(tournamentId)
+        : listTournamentTeams(tournamentId)
 }
 
 // Remove a team from a tournament. Only the organizer or the user who added it can; the team itself stays.

@@ -20,3 +20,10 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
         return failure(res, isTokenExpired(err) ? ACCESS_TOKEN_EXPIRED : UNAUTHORIZED, 401)
     }
 }
+
+// For public routes that show more to a logged in user: no Authorization header means a guest,
+// otherwise the token must be valid (an expired one gets the same 401 so the frontend refreshes and retries)
+export const authenticateOptional = (req: Request, res: Response, next: NextFunction) => {
+    if (!req.headers.authorization) return next()
+    return authenticate(req, res, next)
+}
