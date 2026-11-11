@@ -18,6 +18,8 @@ import {
     NOT_ORGANIZER,
     NOT_OPEN_FOR_UPDATE,
     ORGANIZER_CANNOT_ADD_TEAMS,
+    REGISTRATION_CLOSED,
+    START_BEFORE_REGISTRATION_END,
     TEAM_ALREADY_ENROLLED,
     TEAM_NOT_ENROLLED,
     TOURNAMENT_NOT_FOUND,
@@ -56,7 +58,8 @@ const deriveStatus = (
 
 const toSummary = (row: TournamentSummaryRow, today: string) => {
     const { cancelledAt, ...rest } = row
-    return { ...rest, cancelledAt, status: deriveStatus(row, today) }
+    // Registration stays open through the last registration date itself
+    return { ...rest, cancelledAt, status: deriveStatus(row, today), registrationClosed: row.lastRegistrationDate < today }
 }
 
 // Keep only the tags the editor can make, so stored HTML is safe to render
@@ -85,6 +88,7 @@ export const createTournament = async (organizerId: number, input: CreateTournam
             location: input.location,
             startDate: input.startDate,
             endDate: input.endDate,
+            lastRegistrationDate: input.lastRegistrationDate,
             registrationFee: input.registrationFee,
             prizeMoney: input.prizeMoney,
             playersPerSide: input.playersPerSide,
@@ -125,6 +129,7 @@ export const rescheduleTournament = async (userId: number, id: number, input: Re
     if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
     if (existing.cancelledAt) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
     if (existing.endDate < today) throw new ConflictError(COMPLETED_CANNOT_RESCHEDULE)
+    if (input.startDate < existing.lastRegistrationDate) throw new ConflictError(START_BEFORE_REGISTRATION_END)
 
     const row = await markRescheduled(id, input.startDate, input.endDate)
     // Cancelled by a parallel request between the check and the update
@@ -190,9 +195,9 @@ export const addTeamsToTournament = async (userId: number, tournamentId: number,
     const tournament = await findTournamentForCancel(tournamentId)
     if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
     if (tournament.organizerId === userId) throw new ForbiddenError(ORGANIZER_CANNOT_ADD_TEAMS)
-    if (tournament.cancelledAt || tournament.endDate < todayInTimezone(TOURNAMENT_TIMEZONE)) {
-        throw new ConflictError(TOURNAMENT_NOT_OPEN)
-    }
+    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
+    if (tournament.cancelledAt || tournament.endDate < today) throw new ConflictError(TOURNAMENT_NOT_OPEN)
+    if (tournament.lastRegistrationDate < today) throw new ConflictError(REGISTRATION_CLOSED)
 
     await assertManagesTeams(userId, teamIds)
 

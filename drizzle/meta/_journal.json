@@ -183,6 +183,13 @@
       "when": 1794381310577,
       "tag": "0025_living_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794390185304,
+      "tag": "0026_blushing_sabretooth",
+      "breakpoints": true
     }
   ]
 }

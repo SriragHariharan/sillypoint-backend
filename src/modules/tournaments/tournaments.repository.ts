@@ -13,6 +13,7 @@ const summaryColumns = {
     location: tournaments.location,
     startDate: tournaments.startDate,
     endDate: tournaments.endDate,
+    lastRegistrationDate: tournaments.lastRegistrationDate,
     registrationFee: tournaments.registrationFee,
     prizeMoney: tournaments.prizeMoney,
     playersPerSide: tournaments.playersPerSide,
@@ -50,6 +51,7 @@ export const insertTournament = async (values: {
     location: string
     startDate: string
     endDate: string
+    lastRegistrationDate: string
     registrationFee: number
     prizeMoney: number
     playersPerSide: number
@@ -66,6 +68,7 @@ export const findTournamentForCancel = async (id: number) => {
             id: tournaments.id,
             organizerId: tournaments.organizerId,
             endDate: tournaments.endDate,
+            lastRegistrationDate: tournaments.lastRegistrationDate,
             cancelledAt: tournaments.cancelledAt,
         })
         .from(tournaments)

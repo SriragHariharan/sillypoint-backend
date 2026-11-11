@@ -22,6 +22,8 @@ export const tournaments = pgTable(
         location: varchar("location", { length: 120 }).notNull(),
         startDate: date("start_date", { mode: "string" }).notNull(),
         endDate: date("end_date", { mode: "string" }).notNull(),
+        // Teams can be added up to and including this day; fixed when the tournament is created
+        lastRegistrationDate: date("last_registration_date", { mode: "string" }).notNull(),
         // Whole rupees. The registration fee is fixed when the tournament is created; only the prize money can change.
         registrationFee: integer("registration_fee").notNull().default(0),
         prizeMoney: integer("prize_money").notNull().default(0),
@@ -40,6 +42,7 @@ export const tournaments = pgTable(
         index("tournaments_organizer_id_idx").on(table.organizerId),
         index("tournaments_start_date_idx").on(table.startDate),
         check("tournaments_dates_order", sql`${table.endDate} >= ${table.startDate}`),
+        check("tournaments_registration_deadline_order", sql`${table.lastRegistrationDate} <= ${table.startDate}`),
         check("tournaments_registration_fee_non_negative", sql`${table.registrationFee} >= 0`),
         check("tournaments_prize_money_non_negative", sql`${table.prizeMoney} >= 0`),
         check(

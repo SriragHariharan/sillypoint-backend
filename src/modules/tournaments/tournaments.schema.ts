@@ -53,8 +53,20 @@ const withDateRules = <T extends z.ZodType<{ startDate: string; endDate: string 
             path: ["endDate"],
         })
 
+// Teams can register up to the start of the tournament, never in the past
+const withRegistrationRules = <T extends z.ZodType<{ startDate: string; lastRegistrationDate: string }>>(schema: T) =>
+    schema
+        .refine((body) => body.lastRegistrationDate >= todayInTimezone(TOURNAMENT_TIMEZONE), {
+            message: "Last registration date cannot be in the past",
+            path: ["lastRegistrationDate"],
+        })
+        .refine((body) => body.lastRegistrationDate <= body.startDate, {
+            message: "Last registration date must be on or before the start date",
+            path: ["lastRegistrationDate"],
+        })
+
 // Create body (multipart, so every value arrives as text). The organizer is never read from the body.
-export const createTournamentSchema = withDateRules(
+export const createTournamentSchema = withRegistrationRules(withDateRules(
     z.object({
         name: z
             .string({ error: "Name is required" })
@@ -72,12 +84,13 @@ export const createTournamentSchema = withDateRules(
             .max(LOCATION_MAX_LENGTH, `Location must be at most ${LOCATION_MAX_LENGTH} characters`),
         startDate: isoDate("Start date"),
         endDate: isoDate("End date"),
+        lastRegistrationDate: isoDate("Last registration date"),
         registrationFee: amountText("Registration fee"),
         prizeMoney: amountText("Prize money"),
         playersPerSide: countText("Players per side", MIN_PLAYERS_PER_SIDE, PLAYING_XI_SIZE),
         substitutesPerSide: countText("Substitutes per side", MIN_SUBSTITUTES_PER_SIDE, SUBSTITUTES_SIZE),
     }),
-)
+))
 
 export const rescheduleTournamentSchema = withDateRules(
     z.object({
