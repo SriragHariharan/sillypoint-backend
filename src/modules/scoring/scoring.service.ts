@@ -38,7 +38,9 @@ import {
 import { BALLS_PER_OVER } from "../../shared/constants/scoring.js"
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/http/errors.js"
 import { assertScoringOpen, getMatch } from "../matches/matches.service.js"
+import { todayInTimezone } from "../../shared/utils/date.js"
 import { getMatchPlayers } from "../squads/squads.service.js"
+import { TOURNAMENT_TIMEZONE } from "../tournaments/tournaments.constants.js"
 import {
     BOTH_INNINGS_STARTED,
     FIRST_INNINGS_NOT_OVER,
@@ -50,6 +52,8 @@ import {
     OPENING_BATTER_NOT_IN_XI,
     OPENING_BOWLER_NOT_IN_XI,
     SCORE_CHANGED,
+    SCORECARD_CACHE_CONTROL_COMPLETED,
+    SCORECARD_CACHE_CONTROL_LIVE,
 } from "./scoring.constants.js"
 import {
     type DeliveryRecord,
@@ -57,6 +61,7 @@ import {
     findLastSeq,
     findLiveDeliveries,
     findLiveDeliveriesOfMatch,
+    findScorecardFingerprint,
     type InningsRow,
     inTransaction,
     insertDelivery,
@@ -69,6 +74,7 @@ import {
     updateInnings,
     voidDelivery,
 } from "./scoring.repository.js"
+import { createScorecardCache } from "./scorecard-cache.js"
 import {
     type ChooseBatterInput,
     type ChooseBowlerInput,
@@ -237,6 +243,22 @@ export const getScorecard = async (matchId: number) => {
                 ...card,
             }
         }),
+    }
+}
+
+const scorecardCache = createScorecardCache({
+    readFingerprint: findScorecardFingerprint,
+    build: getScorecard,
+    today: () => todayInTimezone(TOURNAMENT_TIMEZONE),
+})
+
+// The public scorecard for polling: served from the cache, with the etag and cache headers the controller sends
+export const getScorecardSnapshot = async (matchId: number) => {
+    const { etag, body, completed } = await scorecardCache.get(matchId)
+    return {
+        etag,
+        body,
+        cacheControl: completed ? SCORECARD_CACHE_CONTROL_COMPLETED : SCORECARD_CACHE_CONTROL_LIVE,
     }
 }
 

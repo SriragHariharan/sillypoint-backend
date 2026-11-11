@@ -14,3 +14,12 @@ export const OPENING_BOWLER_NOT_IN_XI = "The opening bowler must be from the bow
 export const NEXT_INNINGS_STARTED = "The next innings has already started, so this innings cannot be changed"
 
 export const INNINGS_STARTED = "Innings started"
+
+// The public scorecard is cached in memory so many viewers polling one match cost the database one cheap query per TTL
+export const SCORECARD_CACHE_TTL_MS = 1000
+// A decided match no longer changes, so it is only re-checked now and then
+export const SCORECARD_COMPLETED_CACHE_TTL_MS = 30_000
+export const SCORECARD_CACHE_MAX_ENTRIES = 500
+// Browsers revalidate every poll (cheap 304); a CDN may reuse a live scorecard for 2 seconds and a final one for 5 minutes
+export const SCORECARD_CACHE_CONTROL_LIVE = "public, max-age=0, s-maxage=2"
+export const SCORECARD_CACHE_CONTROL_COMPLETED = "public, max-age=30, s-maxage=300"

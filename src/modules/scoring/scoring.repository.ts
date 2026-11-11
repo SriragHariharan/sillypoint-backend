@@ -30,6 +30,28 @@ export const lockMatchState = async (tx: Tx, matchId: number) => {
     return row
 }
 
+// The few columns that tell whether a public scorecard has changed: two tiny queries, no deliveries
+export const findScorecardFingerprint = async (matchId: number) => {
+    const [matchRows, inningsRows] = await Promise.all([
+        db
+            .select({ scoringStartedAt: matches.scoringStartedAt, completedAt: matches.completedAt })
+            .from(matches)
+            .where(eq(matches.id, matchId))
+            .limit(1),
+        db
+            .select({ id: innings.id, version: innings.version, status: innings.status })
+            .from(innings)
+            .where(eq(innings.matchId, matchId))
+            .orderBy(asc(innings.inningsNumber)),
+    ])
+    const match = matchRows[0]
+    return {
+        scoringStarted: Boolean(match?.scoringStartedAt),
+        completed: Boolean(match?.completedAt),
+        innings: inningsRows,
+    }
+}
+
 export const findInningsOfMatch = (executor: Executor, matchId: number) =>
     executor.select().from(innings).where(eq(innings.matchId, matchId)).orderBy(asc(innings.inningsNumber))
 

@@ -65,8 +65,12 @@ export const end = async (req: Request, res: Response) => {
     return success(res, await scoringService.finishInnings(matchIdOf(res), inningsOf(res), expectedVersion))
 }
 
-// Public scorecard of a match
-export const scorecard = async (_req: Request, res: Response) => {
+// Public scorecard of a match, meant to be polled: cached, with an ETag so an unchanged poll gets an empty 304
+export const scorecard = async (req: Request, res: Response) => {
     const { id } = res.locals.params as MatchIdParams
-    return success(res, await scoringService.getScorecard(id))
+    const { etag, body, cacheControl } = await scoringService.getScorecardSnapshot(id)
+    // Set only after a successful lookup, so a 404 is never cached
+    res.set({ ETag: etag, "Cache-Control": cacheControl })
+    if (req.fresh) return res.status(304).end()
+    return success(res, body)
 }
