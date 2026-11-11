@@ -28,8 +28,6 @@ const matchColumns = {
     resultType: matches.resultType,
     winnerTeamId: matches.winnerTeamId,
     resultSummary: matches.resultSummary,
-    // Set when the scorer concludes the finished match; from then on scoring (including undo) is locked
-    concludedAt: matches.concludedAt,
     createdAt: matches.createdAt,
     teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
     teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },

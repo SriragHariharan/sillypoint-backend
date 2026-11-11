@@ -176,6 +176,13 @@
       "when": 1794379740465,
       "tag": "0024_moaning_johnny_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794381310577,
+      "tag": "0025_living_jubilee",
+      "breakpoints": true
     }
   ]
 }

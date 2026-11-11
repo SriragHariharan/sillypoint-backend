@@ -19,19 +19,15 @@ export const lockMatch = async (tx: Tx, matchId: number) => {
     await tx.select({ id: matches.id }).from(matches).where(eq(matches.id, matchId)).limit(1).for("update")
 }
 
-// The match row locked until the transaction ends, with the two moments that decide whether it can still change
+// The match row locked until the transaction ends, with the moment it was decided (null while it can still change)
 export const lockMatchState = async (tx: Tx, matchId: number) => {
     const [row] = await tx
-        .select({ completedAt: matches.completedAt, concludedAt: matches.concludedAt })
+        .select({ completedAt: matches.completedAt })
         .from(matches)
         .where(eq(matches.id, matchId))
         .limit(1)
         .for("update")
     return row
-}
-
-export const markMatchConcluded = async (tx: Tx, matchId: number) => {
-    await tx.update(matches).set({ concludedAt: new Date() }).where(eq(matches.id, matchId))
 }
 
 export const findInningsOfMatch = (executor: Executor, matchId: number) =>
@@ -116,13 +112,5 @@ export const saveMatchResult = async (
             winnerTeamId: result.winnerTeamId,
             resultSummary: result.resultSummary,
         })
-        .where(eq(matches.id, matchId))
-}
-
-// Undo of the ball that ended the match: the match is not over any more
-export const clearMatchResult = async (tx: Tx, matchId: number) => {
-    await tx
-        .update(matches)
-        .set({ completedAt: null, resultType: null, winnerTeamId: null, resultSummary: null })
         .where(eq(matches.id, matchId))
 }

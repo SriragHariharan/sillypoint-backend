@@ -65,11 +65,6 @@ export const end = async (req: Request, res: Response) => {
     return success(res, await scoringService.finishInnings(matchIdOf(res), inningsOf(res), expectedVersion))
 }
 
-// Conclude the finished match: the result is final and nothing can be undone any more (scorer token)
-export const conclude = async (_req: Request, res: Response) => {
-    return success(res, await scoringService.concludeMatch(matchIdOf(res)))
-}
-
 // Public scorecard of a match
 export const scorecard = async (_req: Request, res: Response) => {
     const { id } = res.locals.params as MatchIdParams

@@ -44,16 +44,14 @@ import {
     FIRST_INNINGS_NOT_OVER,
     INNINGS_NOT_FOUND,
     MATCH_ALREADY_COMPLETED,
-    MATCH_CONCLUDED,
-    MATCH_NOT_FINISHED,
     MATCH_NOT_READY,
+    MATCH_OVER,
     NEXT_INNINGS_STARTED,
     OPENING_BATTER_NOT_IN_XI,
     OPENING_BOWLER_NOT_IN_XI,
     SCORE_CHANGED,
 } from "./scoring.constants.js"
 import {
-    clearMatchResult,
     type DeliveryRecord,
     findInningsOfMatch,
     findLastSeq,
@@ -66,7 +64,6 @@ import {
     lockInnings,
     lockMatch,
     lockMatchState,
-    markMatchConcluded,
     markScoringStarted,
     saveMatchResult,
     updateInnings,
@@ -174,8 +171,8 @@ const buildState = async (match: Match) => {
             names: namesOf(players),
             rules: rulesOf(match),
         })
-        // A concluded match is final: nothing can be taken back any more
-        current = { ...inningsSummary(latest), ...view, canUndo: view.canUndo && !match.concludedAt }
+        // A finished match is final: nothing can be taken back any more
+        current = { ...inningsSummary(latest), ...view, canUndo: view.canUndo && !match.completedAt }
     }
 
     const first = list[0]
@@ -304,22 +301,6 @@ export const startInnings = async (matchId: number, input: StartInningsInput) =>
     return getScoringState(matchId)
 }
 
-// --- Concluding the match --------------------------------------------------------------------------------------
-
-// The scorer confirms the finished match: the result becomes final, so no ball (undo included) can change it again.
-// Only possible once the second innings has decided the result; concluding twice is harmless.
-export const concludeMatch = async (matchId: number) => {
-    await assertScoringOpen(matchId)
-
-    await inTransaction(async (tx) => {
-        const locked = await lockMatchState(tx, matchId)
-        if (!locked?.completedAt) throw new BadRequestError(MATCH_NOT_FINISHED)
-        if (!locked.concludedAt) await markMatchConcluded(tx, matchId)
-    })
-
-    return getScoringState(matchId)
-}
-
 // --- Changing an innings ---------------------------------------------------------------------------------------
 
 type StepInput = {
@@ -356,8 +337,8 @@ const changeInnings = async (matchId: number, inningsNumber: number, expectedVer
     await inTransaction(async (tx) => {
         const row = await lockInnings(tx, matchId, inningsNumber)
         if (!row) throw new NotFoundError(INNINGS_NOT_FOUND)
-        // Checked under the match lock, so a conclusion that just happened is never overtaken by a late tap
-        if ((await lockMatchState(tx, matchId))?.concludedAt) throw new ConflictError(MATCH_CONCLUDED)
+        // A finished match is final. Checked under the match lock, so a tap that races the deciding ball is rejected
+        if ((await lockMatchState(tx, matchId))?.completedAt) throw new ConflictError(MATCH_OVER)
         if (row.version !== expectedVersion) throw new ConflictError(SCORE_CHANGED)
 
         const records = await findLiveDeliveries(tx, row.id)
@@ -394,10 +375,10 @@ const changeInnings = async (matchId: number, inningsNumber: number, expectedVer
             version: row.version + 1,
         })
 
-        // The second innings decides the match; taking its last ball back reopens the match
+        // The second innings decides the match and the result is final (nothing can be changed or undone afterwards)
         if (inningsNumber === 2) {
             const first = allInnings.find((innings) => innings.inningsNumber === 1)
-            if (finished && row.status !== "completed" && first) {
+            if (finished && first) {
                 const result = computeResult({
                     first: { teamId: first.battingTeamId, name: teamOf(match, first.battingTeamId).name, runs: first.runs },
                     second: {
@@ -414,7 +395,6 @@ const changeInnings = async (matchId: number, inningsNumber: number, expectedVer
                     resultSummary: result.summary,
                 })
             }
-            if (!finished && row.status === "completed") await clearMatchResult(tx, matchId)
         }
     })
 
