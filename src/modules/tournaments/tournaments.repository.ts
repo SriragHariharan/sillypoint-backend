@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, type SQL } from "drizzle-orm"
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, lt, lte, or, type SQL } from "drizzle-orm"
 import { db } from "../../db/postgres.js"
 import { teams, tournamentTeams, tournaments, users } from "../../db/schema/index.js"
 import { type Tx } from "../users/users.repository.js"
@@ -18,7 +18,6 @@ const summaryColumns = {
     prizeMoney: tournaments.prizeMoney,
     playersPerSide: tournaments.playersPerSide,
     substitutesPerSide: tournaments.substitutesPerSide,
-    cancelledAt: tournaments.cancelledAt,
     createdAt: tournaments.createdAt,
 }
 
@@ -30,14 +29,12 @@ const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&")
 // The status filter, worked out from the dates. `today` is a YYYY-MM-DD string in the tournament time zone.
 const statusCondition = (status: NonNullable<ListTournamentsQuery["status"]>, today: string) => {
     switch (status) {
-        case "cancelled":
-            return isNotNull(tournaments.cancelledAt)
         case "upcoming":
-            return and(isNull(tournaments.cancelledAt), gt(tournaments.startDate, today))
+            return gt(tournaments.startDate, today)
         case "live":
-            return and(isNull(tournaments.cancelledAt), lte(tournaments.startDate, today), gte(tournaments.endDate, today))
+            return and(lte(tournaments.startDate, today), gte(tournaments.endDate, today))
         case "completed":
-            return and(isNull(tournaments.cancelledAt), lt(tournaments.endDate, today))
+            return lt(tournaments.endDate, today)
     }
 }
 
@@ -62,48 +59,17 @@ export const insertTournament = async (values: {
 }
 
 // The few columns needed to check who owns a tournament and what state it is in
-export const findTournamentForCancel = async (id: number) => {
+export const findTournamentBasics = async (id: number) => {
     const [row] = await db
         .select({
             id: tournaments.id,
             organizerId: tournaments.organizerId,
             endDate: tournaments.endDate,
             lastRegistrationDate: tournaments.lastRegistrationDate,
-            cancelledAt: tournaments.cancelledAt,
         })
         .from(tournaments)
         .where(eq(tournaments.id, id))
         .limit(1)
-    return row
-}
-
-// Cancel a tournament that is not cancelled yet. Returns nothing if someone else cancelled it first.
-export const markCancelled = async (id: number) => {
-    const [row] = await db
-        .update(tournaments)
-        .set({ cancelledAt: new Date() })
-        .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
-        .returning(summaryColumns)
-    return row
-}
-
-// Move a tournament that is not cancelled to new dates. Returns nothing if someone cancelled it first.
-export const markRescheduled = async (id: number, startDate: string, endDate: string) => {
-    const [row] = await db
-        .update(tournaments)
-        .set({ startDate, endDate })
-        .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
-        .returning(summaryColumns)
-    return row
-}
-
-// Change only the prize money of a tournament that is not cancelled. The registration fee is never updated.
-export const markPrizeMoneyUpdated = async (id: number, prizeMoney: number) => {
-    const [row] = await db
-        .update(tournaments)
-        .set({ prizeMoney })
-        .where(and(eq(tournaments.id, id), isNull(tournaments.cancelledAt)))
-        .returning(summaryColumns)
     return row
 }
 
@@ -131,9 +97,7 @@ export const listTournaments = async (query: ListTournamentsQuery, today: string
         conditions.push(or(ilike(tournaments.name, pattern), ilike(tournaments.location, pattern)))
     }
     if (query.status) conditions.push(statusCondition(query.status, today))
-    if (query.registrationOpen) {
-        conditions.push(isNull(tournaments.cancelledAt), gte(tournaments.lastRegistrationDate, today))
-    }
+    if (query.registrationOpen) conditions.push(gte(tournaments.lastRegistrationDate, today))
     if (query.startFrom) conditions.push(gte(tournaments.startDate, query.startFrom))
     if (query.startTo) conditions.push(lte(tournaments.startDate, query.startTo))
     if (query.organizerId) conditions.push(eq(tournaments.organizerId, query.organizerId))

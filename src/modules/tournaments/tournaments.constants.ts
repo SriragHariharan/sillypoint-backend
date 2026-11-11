@@ -19,34 +19,26 @@ export const LIST_DEFAULT_LIMIT = 12
 export const LIST_MAX_LIMIT = 50
 export const SEARCH_MAX_LENGTH = 80
 
-export const TOURNAMENT_STATUSES = ["upcoming", "live", "completed", "cancelled"] as const
+export const TOURNAMENT_STATUSES = ["upcoming", "live", "completed"] as const
 
 export const TOURNAMENT_NOT_FOUND = "Tournament not found"
 export const NOT_ORGANIZER = "Only the organizer can do this"
-export const ALREADY_CANCELLED = "Tournament is already cancelled"
-export const ALREADY_COMPLETED = "A completed tournament cannot be cancelled"
 export const DESCRIPTION_TOO_LONG = `Description must be at most ${DESCRIPTION_MAX_TEXT_LENGTH} characters`
 
 export const MAX_TEAMS_PER_REQUEST = 50
 export const TEAMS_ADDED = "Teams added"
 export const TEAM_REMOVED = "Team removed"
-export const TOURNAMENT_NOT_OPEN = "Teams cannot be added to a cancelled or completed tournament"
+export const TOURNAMENT_NOT_OPEN = "Teams cannot be added to a completed tournament"
 export const REGISTRATION_CLOSED = "Registration for this tournament is closed"
-export const START_BEFORE_REGISTRATION_END = "Start date cannot be before the last registration date"
 export const TEAM_ALREADY_ENROLLED = "One or more teams are already added to this tournament"
 export const TEAM_NOT_ENROLLED = "Team is not in this tournament"
 export const NOT_ALLOWED_TO_REMOVE_TEAM = "Only the organizer or the user who added the team can remove it"
 export const ORGANIZER_CANNOT_ADD_TEAMS = "Organizers cannot add teams to their own tournament"
-export const CANCELLED_CANNOT_RESCHEDULE = "A cancelled tournament cannot be rescheduled"
-export const COMPLETED_CANNOT_RESCHEDULE = "A completed tournament cannot be rescheduled"
-export const TOURNAMENT_RESCHEDULED = "Tournament rescheduled"
 
 // Registration fee and prize money are whole rupees
 export const MAX_AMOUNT = 10_000_000
-export const PRIZE_MONEY_UPDATED = "Prize money updated"
 
 // How many players and substitutes each team names for a match; the organizer picks both when creating the tournament.
 // The upper limits (11 and 4) are PLAYING_XI_SIZE and SUBSTITUTES_SIZE in shared/constants/squads.ts.
 export const MIN_PLAYERS_PER_SIDE = 5
 export const MIN_SUBSTITUTES_PER_SIDE = 0
-export const NOT_OPEN_FOR_UPDATE = "A cancelled or completed tournament cannot be edited"

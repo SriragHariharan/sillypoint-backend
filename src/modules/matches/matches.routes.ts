@@ -7,7 +7,6 @@ import {
     create,
     details,
     list,
-    reschedule,
     scorerAccess,
     scorerLogin,
     scorerMe,
@@ -17,7 +16,6 @@ import {
 import {
     createMatchSchema,
     matchIdParamsSchema,
-    rescheduleMatchSchema,
     scorerLoginSchema,
     setOversSchema,
     setTossSchema,
@@ -36,15 +34,6 @@ export const matchRouter = Router()
 
 // GET /api/matches/:id: public details
 matchRouter.get("/:id", validate(matchIdParamsSchema, "params"), details)
-
-// PATCH /api/matches/:id/reschedule: organizer only
-matchRouter.patch(
-    "/:id/reschedule",
-    authenticate,
-    validate(matchIdParamsSchema, "params"),
-    validate(rescheduleMatchSchema),
-    reschedule,
-)
 
 // GET /api/matches/:id/scorer/access: organizer only, the scorer's login link token and PIN
 matchRouter.get("/:id/scorer/access", authenticate, validate(matchIdParamsSchema, "params"), scorerAccess)

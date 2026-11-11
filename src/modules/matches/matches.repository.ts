@@ -61,16 +61,6 @@ export const findMatch = async (id: number) => {
     return row
 }
 
-// Move a match to a new time. Returns nothing if the match is gone, has a result or scoring has started.
-export const updateMatchSchedule = async (id: number, scheduledAt: Date) => {
-    const [row] = await db
-        .update(matches)
-        .set({ scheduledAt })
-        .where(and(eq(matches.id, id), isNull(matches.completedAt), isNull(matches.scoringStartedAt)))
-        .returning({ id: matches.id })
-    return row
-}
-
 // Record (or change) the toss. Returns nothing if the match is gone.
 export const setMatchToss = async (id: number, tossWinnerTeamId: number, tossDecision: string) => {
     const [row] = await db

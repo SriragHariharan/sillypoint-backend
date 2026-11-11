@@ -6,20 +6,14 @@ import { todayInTimezone } from "../../shared/utils/date.js"
 import { getMe } from "../auth/auth.service.js"
 import { assertManagesTeams } from "../teams/teams.service.js"
 import {
-    ALREADY_CANCELLED,
-    ALREADY_COMPLETED,
-    CANCELLED_CANNOT_RESCHEDULE,
-    COMPLETED_CANNOT_RESCHEDULE,
     DESCRIPTION_ALLOWED_TAGS,
     DESCRIPTION_MAX_TEXT_LENGTH,
     DESCRIPTION_TOO_LONG,
     LOGO_FOLDER,
     NOT_ALLOWED_TO_REMOVE_TEAM,
     NOT_ORGANIZER,
-    NOT_OPEN_FOR_UPDATE,
     ORGANIZER_CANNOT_ADD_TEAMS,
     REGISTRATION_CLOSED,
-    START_BEFORE_REGISTRATION_END,
     TEAM_ALREADY_ENROLLED,
     TEAM_NOT_ENROLLED,
     TOURNAMENT_NOT_FOUND,
@@ -30,38 +24,32 @@ import {
     deleteEnrollment,
     findEnrolledTeamIds,
     findEnrollmentForUpdate,
+    findTournamentBasics,
     findTournamentDetails,
-    findTournamentForCancel,
     insertTournament,
     insertTournamentTeams,
     listTournamentTeams,
     listTournamentTeamsForOrganizer,
     listTournaments,
-    markCancelled,
-    markPrizeMoneyUpdated,
-    markRescheduled,
     type TournamentSummaryRow,
 } from "./tournaments.repository.js"
-import { type CreateTournamentInput, type ListTournamentsQuery, type RescheduleTournamentInput, type UpdateTournamentInput } from "./tournaments.schema.js"
+import { type CreateTournamentInput, type ListTournamentsQuery } from "./tournaments.schema.js"
 
-type TournamentStatus = "upcoming" | "live" | "completed" | "cancelled"
+type TournamentStatus = "upcoming" | "live" | "completed"
 
-// upcoming / live / completed come from the dates; cancelled is the only saved state
-const deriveStatus = (
-    row: { startDate: string; endDate: string; cancelledAt: Date | null },
-    today: string,
-): TournamentStatus => {
-    if (row.cancelledAt) return "cancelled"
+// The status is never stored: it comes from the dates
+const deriveStatus = (row: { startDate: string; endDate: string }, today: string): TournamentStatus => {
     if (row.startDate > today) return "upcoming"
     if (row.endDate < today) return "completed"
     return "live"
 }
 
-const toSummary = (row: TournamentSummaryRow, today: string) => {
-    const { cancelledAt, ...rest } = row
-    // Registration stays open through the last registration date itself
-    return { ...rest, cancelledAt, status: deriveStatus(row, today), registrationClosed: row.lastRegistrationDate < today }
-}
+// Registration stays open through the last registration date itself
+const toSummary = (row: TournamentSummaryRow, today: string) => ({
+    ...row,
+    status: deriveStatus(row, today),
+    registrationClosed: row.lastRegistrationDate < today,
+})
 
 // Keep only the tags the editor can make, so stored HTML is safe to render
 const sanitizeDescription = (html: string) => {
@@ -104,57 +92,6 @@ export const createTournament = async (organizerId: number, input: CreateTournam
     }
 }
 
-// Cancel a tournament. Only its organizer can, and only while it is not cancelled or finished.
-export const cancelTournament = async (userId: number, id: number) => {
-    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
-    const existing = await findTournamentForCancel(id)
-
-    if (!existing) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
-    if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (existing.cancelledAt) throw new ConflictError(ALREADY_CANCELLED)
-    if (existing.endDate < today) throw new ConflictError(ALREADY_COMPLETED)
-
-    const row = await markCancelled(id)
-    // Cancelled by a parallel request between the check and the update
-    if (!row) throw new ConflictError(ALREADY_CANCELLED)
-
-    return toSummary(row, today)
-}
-
-// Move a tournament to new dates. Only its organizer can, and only while it is not cancelled or finished.
-export const rescheduleTournament = async (userId: number, id: number, input: RescheduleTournamentInput) => {
-    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
-    const existing = await findTournamentForCancel(id)
-
-    if (!existing) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
-    if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (existing.cancelledAt) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
-    if (existing.endDate < today) throw new ConflictError(COMPLETED_CANNOT_RESCHEDULE)
-    if (input.startDate < existing.lastRegistrationDate) throw new ConflictError(START_BEFORE_REGISTRATION_END)
-
-    const row = await markRescheduled(id, input.startDate, input.endDate)
-    // Cancelled by a parallel request between the check and the update
-    if (!row) throw new ConflictError(CANCELLED_CANNOT_RESCHEDULE)
-
-    return toSummary(row, today)
-}
-
-// Change the prize money. Only the organizer can, and only while the tournament is not cancelled or finished.
-export const updateTournament = async (userId: number, id: number, input: UpdateTournamentInput) => {
-    const today = todayInTimezone(TOURNAMENT_TIMEZONE)
-    const existing = await findTournamentForCancel(id)
-
-    if (!existing) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
-    if (existing.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (existing.cancelledAt || existing.endDate < today) throw new ConflictError(NOT_OPEN_FOR_UPDATE)
-
-    const row = await markPrizeMoneyUpdated(id, input.prizeMoney)
-    // Cancelled by a parallel request between the check and the update
-    if (!row) throw new ConflictError(NOT_OPEN_FOR_UPDATE)
-
-    return toSummary(row, today)
-}
-
 // Public list with filters and paging
 export const listAllTournaments = async (query: ListTournamentsQuery) => {
     const today = todayInTimezone(TOURNAMENT_TIMEZONE)
@@ -189,15 +126,15 @@ const isDuplicateEnrollment = (err: unknown) => {
     )
 }
 
-// Add teams the user manages to a tournament that is not cancelled or finished. All teams are added, or none.
+// Add teams the user manages to a tournament that is not finished. All teams are added, or none.
 export const addTeamsToTournament = async (userId: number, tournamentId: number, teamIds: number[]) => {
     await getMe(userId)
 
-    const tournament = await findTournamentForCancel(tournamentId)
+    const tournament = await findTournamentBasics(tournamentId)
     if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
     if (tournament.organizerId === userId) throw new ForbiddenError(ORGANIZER_CANNOT_ADD_TEAMS)
     const today = todayInTimezone(TOURNAMENT_TIMEZONE)
-    if (tournament.cancelledAt || tournament.endDate < today) throw new ConflictError(TOURNAMENT_NOT_OPEN)
+    if (tournament.endDate < today) throw new ConflictError(TOURNAMENT_NOT_OPEN)
     if (tournament.lastRegistrationDate < today) throw new ConflictError(REGISTRATION_CLOSED)
 
     await assertManagesTeams(userId, teamIds)
@@ -223,7 +160,7 @@ export const addTeamsToTournament = async (userId: number, tournamentId: number,
 
 // List of the teams in a tournament. Public, but the manager mobiles go only to the tournament's organizer.
 export const listTeamsInTournament = async (tournamentId: number, viewerId?: number) => {
-    const tournament = await findTournamentForCancel(tournamentId)
+    const tournament = await findTournamentBasics(tournamentId)
     if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
 
     return viewerId !== undefined && viewerId === tournament.organizerId
@@ -233,7 +170,7 @@ export const listTeamsInTournament = async (tournamentId: number, viewerId?: num
 
 // Remove a team from a tournament. Only the organizer or the user who added it can; the team itself stays.
 export const removeTeamFromTournament = async (userId: number, tournamentId: number, teamId: number) => {
-    const tournament = await findTournamentForCancel(tournamentId)
+    const tournament = await findTournamentBasics(tournamentId)
     if (!tournament) throw new NotFoundError(TOURNAMENT_NOT_FOUND)
 
     await db.transaction(async (tx) => {

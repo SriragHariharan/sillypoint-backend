@@ -92,17 +92,15 @@ const inningsB = alias(innings, "innings_b")
 
 const playedBy = (teamId: number) => or(eq(matches.teamAId, teamId), eq(matches.teamBId, teamId))
 
-// The match states, in the order they are decided: finished, then cancelled with its tournament, then being scored, then not started
+// The match states, in the order they are decided: finished, then being scored, then not started
 const stateCondition = (status: NonNullable<TeamMatchesQuery["status"]>) => {
     switch (status) {
         case "completed":
             return isNotNull(matches.completedAt)
-        case "cancelled":
-            return and(isNull(matches.completedAt), isNotNull(tournaments.cancelledAt))
         case "live":
-            return and(isNull(matches.completedAt), isNull(tournaments.cancelledAt), isNotNull(matches.scoringStartedAt))
+            return and(isNull(matches.completedAt), isNotNull(matches.scoringStartedAt))
         case "upcoming":
-            return and(isNull(matches.completedAt), isNull(tournaments.cancelledAt), isNull(matches.scoringStartedAt))
+            return and(isNull(matches.completedAt), isNull(matches.scoringStartedAt))
     }
 }
 
@@ -121,7 +119,7 @@ export const listTeamMatches = async (teamId: number, query: TeamMatchesQuery) =
                 resultType: matches.resultType,
                 winnerTeamId: matches.winnerTeamId,
                 resultSummary: matches.resultSummary,
-                tournament: { id: tournaments.id, name: tournaments.name, cancelledAt: tournaments.cancelledAt },
+                tournament: { id: tournaments.id, name: tournaments.name },
                 teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
                 teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },
                 runsA: inningsA.runs,
@@ -159,7 +157,7 @@ export const summariseTeamMatches = async (teamId: number) => {
             won: sql<number>`count(*) filter (where ${matches.resultType} = 'win' and ${matches.winnerTeamId} = ${teamId})::int`,
             lost: sql<number>`count(*) filter (where ${matches.resultType} = 'win' and ${matches.winnerTeamId} <> ${teamId})::int`,
             tied: sql<number>`count(*) filter (where ${matches.resultType} = 'tie')::int`,
-            upcoming: sql<number>`count(*) filter (where ${matches.completedAt} is null and ${tournaments.cancelledAt} is null and ${matches.scoringStartedAt} is null)::int`,
+            upcoming: sql<number>`count(*) filter (where ${matches.completedAt} is null and ${matches.scoringStartedAt} is null)::int`,
         })
         .from(matches)
         .innerJoin(tournaments, eq(tournaments.id, matches.tournamentId))

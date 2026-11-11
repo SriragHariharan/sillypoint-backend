@@ -101,10 +101,9 @@ type HistoryRow = Awaited<ReturnType<typeof listTeamMatches>>["rows"][number]
 const scoreOf = (runs: number | null, wickets: number | null, balls: number | null) =>
     runs === null || wickets === null || balls === null ? null : { runs, wickets, overs: oversText(balls, BALLS_PER_OVER) }
 
-// Where the match stands: finished, cancelled with its tournament, being scored, or not started
+// Where the match stands: finished, being scored, or not started
 const stateOf = (row: HistoryRow) => {
     if (row.completedAt) return "completed"
-    if (row.tournament.cancelledAt) return "cancelled"
     return row.scoringStartedAt ? "live" : "upcoming"
 }
 

@@ -41,7 +41,6 @@ export const matchIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid match id" }).int().positive("Invalid match id"),
 })
 
-export const rescheduleMatchSchema = z.object({ matchDate, matchTime })
 
 export const setTossSchema = z.object({
     winnerTeamId: teamId("Toss winner"),
@@ -76,7 +75,6 @@ export const createMatchSchema = z
     .refine((body) => body.teamAId !== body.teamBId, { message: SAME_TEAM, path: ["teamBId"] })
 
 export type CreateMatchInput = z.infer<typeof createMatchSchema>
-export type RescheduleMatchInput = z.infer<typeof rescheduleMatchSchema>
 export type ScorerLoginInput = z.infer<typeof scorerLoginSchema>
 export type SetTossInput = z.infer<typeof setTossSchema>
 export type SetOversInput = z.infer<typeof setOversSchema>

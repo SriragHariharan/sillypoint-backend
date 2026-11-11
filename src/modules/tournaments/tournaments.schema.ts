@@ -41,7 +41,7 @@ const countText = (label: string, min: number, max: number) =>
         .transform(Number)
         .refine((value) => value >= min && value <= max, `${label} must be between ${min} and ${max}`)
 
-// The date rules shared by create and reschedule
+// The date rules for a new tournament
 const withDateRules = <T extends z.ZodType<{ startDate: string; endDate: string }>>(schema: T) =>
     schema
         .refine((body) => body.startDate >= todayInTimezone(TOURNAMENT_TIMEZONE), {
@@ -92,27 +92,9 @@ export const createTournamentSchema = withRegistrationRules(withDateRules(
     }),
 ))
 
-export const rescheduleTournamentSchema = withDateRules(
-    z.object({
-        startDate: isoDate("Start date"),
-        endDate: isoDate("End date"),
-    }),
-)
-
 export const tournamentIdParamsSchema = z.object({
     id: z.coerce.number({ error: "Invalid tournament id" }).int().positive("Invalid tournament id"),
 })
-
-// Only the prize money can change after creation. strict() rejects any other key, including registrationFee, playersPerSide and substitutesPerSide.
-export const updateTournamentSchema = z
-    .object({
-        prizeMoney: z
-            .number({ error: "Prize money must be a whole number" })
-            .int("Prize money must be a whole number")
-            .min(0, "Prize money cannot be negative")
-            .max(MAX_AMOUNT, `Prize money must be at most ${MAX_AMOUNT}`),
-    })
-    .strict()
 
 export const enrolledTeamParamsSchema = tournamentIdParamsSchema.extend({
     teamId: z.coerce.number({ error: "Invalid team id" }).int().positive("Invalid team id"),
@@ -138,7 +120,7 @@ export const listTournamentsQuerySchema = z
             .optional()
             .transform((value) => value || undefined),
         status: z.enum(TOURNAMENT_STATUSES, { error: "Invalid status" }).optional(),
-        // Only "true" is accepted: tournaments whose last registration date has not passed (cancelled ones excluded)
+        // Only "true" is accepted: tournaments whose last registration date has not passed
         registrationOpen: z
             .enum(["true"], { error: "registrationOpen must be true" })
             .optional()
@@ -160,8 +142,6 @@ export const listTournamentsQuerySchema = z
     })
 
 export type CreateTournamentInput = z.infer<typeof createTournamentSchema>
-export type RescheduleTournamentInput = z.infer<typeof rescheduleTournamentSchema>
-export type UpdateTournamentInput = z.infer<typeof updateTournamentSchema>
 export type TournamentIdParams = z.infer<typeof tournamentIdParamsSchema>
 export type EnrolledTeamParams = z.infer<typeof enrolledTeamParamsSchema>
 export type AddTeamsInput = z.infer<typeof addTeamsSchema>

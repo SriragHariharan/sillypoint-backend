@@ -1,11 +1,10 @@
 import { type Request, type Response } from "express"
 import { success } from "../../shared/http/response.js"
 import { type TournamentIdParams } from "../tournaments/tournaments.schema.js"
-import { MATCH_CREATED, MATCH_RESCHEDULED, OVERS_SAVED, TOSS_SAVED } from "./matches.constants.js"
+import { MATCH_CREATED, OVERS_SAVED, TOSS_SAVED } from "./matches.constants.js"
 import {
     type CreateMatchInput,
     type MatchIdParams,
-    type RescheduleMatchInput,
     type ScorerLoginInput,
     type SetOversInput,
     type SetTossInput,
@@ -31,13 +30,6 @@ export const details = async (_req: Request, res: Response) => {
     const { id } = res.locals.params as MatchIdParams
     const match = await matchService.getMatch(id)
     return success(res, { match })
-}
-
-// Move a match to a new date and time (organizer only)
-export const reschedule = async (req: Request, res: Response) => {
-    const { id } = res.locals.params as MatchIdParams
-    const match = await matchService.rescheduleMatch(res.locals.userId as number, id, req.body as RescheduleMatchInput)
-    return success(res, { message: MATCH_RESCHEDULED, match })
 }
 
 // The scorer's login link token and PIN (organizer only)

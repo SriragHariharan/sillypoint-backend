@@ -24,14 +24,13 @@ export const tournaments = pgTable(
         endDate: date("end_date", { mode: "string" }).notNull(),
         // Teams can be added up to and including this day; fixed when the tournament is created
         lastRegistrationDate: date("last_registration_date", { mode: "string" }).notNull(),
-        // Whole rupees. The registration fee is fixed when the tournament is created; only the prize money can change.
+        // Whole rupees. Both are fixed when the tournament is created.
         registrationFee: integer("registration_fee").notNull().default(0),
         prizeMoney: integer("prize_money").notNull().default(0),
         // Players and substitutes each team names for a match (the scorer cannot enter more). Fixed when the tournament is created.
         playersPerSide: integer("players_per_side").notNull().default(PLAYING_XI_SIZE),
         substitutesPerSide: integer("substitutes_per_side").notNull().default(SUBSTITUTES_SIZE),
-        // Empty = not cancelled. Upcoming / live / completed is worked out from the dates.
-        cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+        // upcoming / live / completed is never stored: it is worked out from the dates
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true })
             .notNull()

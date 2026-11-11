@@ -13,8 +13,6 @@ import { areTeamsEnrolled, getTournament } from "../tournaments/tournaments.serv
 import { NOT_ORGANIZER } from "../tournaments/tournaments.constants.js"
 import {
     DATE_OUTSIDE_TOURNAMENT,
-    MATCH_ALREADY_STARTED,
-    MATCH_COMPLETED_CANNOT_RESCHEDULE,
     MATCH_IN_PAST,
     MATCH_NOT_FOUND,
     MATCH_TIMEZONE_OFFSET,
@@ -29,7 +27,6 @@ import {
     TEAM_NOT_IN_TOURNAMENT,
     TOSS_TEAM_NOT_IN_MATCH,
     TOURNAMENT_NOT_OPEN,
-    TOURNAMENT_NOT_OPEN_FOR_RESCHEDULE,
     TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN,
 } from "./matches.constants.js"
 import {
@@ -44,11 +41,9 @@ import {
     setMatchOvers,
     setMatchToss,
     setScorerAccess,
-    updateMatchSchedule,
 } from "./matches.repository.js"
 import {
     type CreateMatchInput,
-    type RescheduleMatchInput,
     type ScorerLoginInput,
     type SetOversInput,
     type SetTossInput,
@@ -59,7 +54,7 @@ export const createMatch = async (userId: number, tournamentId: number, input: C
     const tournament = await getTournament(tournamentId)
 
     if (tournament.organizer.id !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (tournament.status === "cancelled" || tournament.status === "completed") {
+    if (tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN)
     }
     if (input.matchDate < tournament.startDate || input.matchDate > tournament.endDate) {
@@ -125,35 +120,6 @@ const matchWithTournament = async (id: number) => {
 // Public details of one match
 export const getMatch = async (id: number) => (await matchWithTournament(id)).match
 
-// Move a match to a new date and time. Only the tournament's organizer can, and only before it starts.
-export const rescheduleMatch = async (userId: number, id: number, input: RescheduleMatchInput) => {
-    const { match, tournament } = await matchWithTournament(id)
-
-    if (tournament.organizerId !== userId) throw new ForbiddenError(NOT_ORGANIZER)
-    if (tournament.status === "cancelled" || tournament.status === "completed") {
-        throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_RESCHEDULE)
-    }
-    // A match with a result is final, whatever its date
-    if (match.completedAt) throw new ConflictError(MATCH_COMPLETED_CANNOT_RESCHEDULE)
-    if (match.scoringStartedAt || match.scheduledAt.getTime() <= Date.now()) throw new ConflictError(MATCH_ALREADY_STARTED)
-    if (input.matchDate < tournament.startDate || input.matchDate > tournament.endDate) {
-        throw new BadRequestError(DATE_OUTSIDE_TOURNAMENT)
-    }
-
-    const scheduledAt = new Date(`${input.matchDate}T${input.matchTime}:00${MATCH_TIMEZONE_OFFSET}`)
-    if (scheduledAt.getTime() <= Date.now()) throw new BadRequestError(MATCH_IN_PAST)
-
-    const updated = await updateMatchSchedule(id, scheduledAt)
-    if (!updated) {
-        // Scoring started or the match concluded between the check and the update
-        const current = await findMatch(id)
-        if (!current) throw new NotFoundError(MATCH_NOT_FOUND)
-        throw new ConflictError(current.completedAt ? MATCH_COMPLETED_CANNOT_RESCHEDULE : MATCH_ALREADY_STARTED)
-    }
-
-    return getMatch(id)
-}
-
 // A new random login link token and a 6-digit PIN like 004217
 const newScorerAccess = (): ScorerAccess => ({
     linkToken: randomBytes(SCORER_LINK_TOKEN_BYTES).toString("base64url"),
@@ -210,7 +176,7 @@ export const scorerLogin = async (input: ScorerLoginInput) => {
 
 // What the scorer's screen needs: the match, the server clock and when scoring opens
 const scorerSessionOf = ({ match, tournament }: Awaited<ReturnType<typeof matchWithTournament>>) => {
-    if (tournament.status === "cancelled" || tournament.status === "completed") {
+    if (tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN)
     }
 
@@ -224,13 +190,13 @@ const scorerSessionOf = ({ match, tournament }: Awaited<ReturnType<typeof matchW
 // The moment the scorer may start scoring: shortly before the scheduled start
 const scoringOpensAt = (scheduledAt: Date) => new Date(scheduledAt.getTime() - SCORING_OPENS_BEFORE_MS)
 
-// The logged-in scorer's session again (page refresh), read fresh so a reschedule or cancellation shows up
+// The logged-in scorer's session again (page refresh), read fresh each time
 export const getScorerSession = async (matchId: number) => scorerSessionOf(await matchWithTournament(matchId))
 
 // Every scoring endpoint calls this: the tournament must still be open and the scorer can only score from 30 minutes before the match starts. Returns the match.
 export const assertScoringOpen = async (matchId: number) => {
     const { match, tournament } = await matchWithTournament(matchId)
-    if (tournament.status === "cancelled" || tournament.status === "completed") {
+    if (tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_SCORER_LOGIN)
     }
     if (scoringOpensAt(match.scheduledAt).getTime() > Date.now()) throw new ForbiddenError(SCORING_NOT_OPEN)
