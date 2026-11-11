@@ -138,6 +138,11 @@ export const listTournamentsQuerySchema = z
             .optional()
             .transform((value) => value || undefined),
         status: z.enum(TOURNAMENT_STATUSES, { error: "Invalid status" }).optional(),
+        // Only "true" is accepted: tournaments whose last registration date has not passed (cancelled ones excluded)
+        registrationOpen: z
+            .enum(["true"], { error: "registrationOpen must be true" })
+            .optional()
+            .transform((value) => value === "true"),
         startFrom: isoDate("startFrom").optional(),
         startTo: isoDate("startTo").optional(),
         organizerId: z.coerce.number({ error: "Invalid organizerId" }).int().positive("Invalid organizerId").optional(),

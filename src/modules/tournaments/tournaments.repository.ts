@@ -131,18 +131,25 @@ export const listTournaments = async (query: ListTournamentsQuery, today: string
         conditions.push(or(ilike(tournaments.name, pattern), ilike(tournaments.location, pattern)))
     }
     if (query.status) conditions.push(statusCondition(query.status, today))
+    if (query.registrationOpen) {
+        conditions.push(isNull(tournaments.cancelledAt), gte(tournaments.lastRegistrationDate, today))
+    }
     if (query.startFrom) conditions.push(gte(tournaments.startDate, query.startFrom))
     if (query.startTo) conditions.push(lte(tournaments.startDate, query.startTo))
     if (query.organizerId) conditions.push(eq(tournaments.organizerId, query.organizerId))
 
     const where = and(...conditions)
+    // Open registrations list the ones closing soonest first; everything else, newest start first
+    const order = query.registrationOpen
+        ? [asc(tournaments.lastRegistrationDate), asc(tournaments.id)]
+        : [desc(tournaments.startDate), desc(tournaments.id)]
 
     const [rows, totals] = await Promise.all([
         db
             .select(summaryColumns)
             .from(tournaments)
             .where(where)
-            .orderBy(desc(tournaments.startDate), desc(tournaments.id))
+            .orderBy(...order)
             .limit(query.limit)
             .offset((query.page - 1) * query.limit),
         db.select({ total: count() }).from(tournaments).where(where),
