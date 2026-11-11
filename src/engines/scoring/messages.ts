@@ -32,3 +32,8 @@ export const RETIRE_NOT_AT_CREASE = "Only a batter at the crease can retire"
 export const RETIRE_WITH_PICK_PENDING = "Choose the next batter or bowler before retiring a batter"
 export const SWAP_NEEDS_TWO_BATTERS = "Both batters must be at the crease to swap them"
 export const NOTHING_TO_UNDO = "There is nothing to undo"
+
+// Super Over results
+export const WON_SUPER_OVER = "won the Super Over"
+export const WON_ON_BOUNDARY_COUNT = "won on boundary count"
+export const TIED_AFTER_SUPER_OVER = "Match tied (Super Over and boundary count level)"

@@ -6,6 +6,7 @@ import {
     INNINGS_END_REASONS,
     INNINGS_STATUS_MAX_LENGTH,
     INNINGS_STATUSES,
+    MAX_INNINGS,
 } from "../../shared/constants/scoring.js"
 import { matchPlayers } from "./match-players.js"
 import { matches } from "./matches.js"
@@ -23,7 +24,7 @@ export const innings = pgTable(
         matchId: integer("match_id")
             .notNull()
             .references(() => matches.id, { onDelete: "restrict" }),
-        // 1 or 2
+        // 1 or 2; 3 and 4 are the Super Over after a tie
         inningsNumber: smallint("innings_number").notNull(),
         battingTeamId: integer("batting_team_id")
             .notNull()
@@ -50,7 +51,7 @@ export const innings = pgTable(
     },
     (table) => [
         uniqueIndex("innings_match_number_uidx").on(table.matchId, table.inningsNumber),
-        check("innings_number_valid", sql`${table.inningsNumber} in (1, 2)`),
+        check("innings_number_valid", sql`${table.inningsNumber} between 1 and ${sql.raw(String(MAX_INNINGS))}`),
         check("innings_teams_differ", sql`${table.battingTeamId} <> ${table.bowlingTeamId}`),
         check("innings_status_valid", sql`${table.status} in (${oneOf(INNINGS_STATUSES)})`),
         check(

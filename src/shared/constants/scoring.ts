@@ -61,3 +61,13 @@ export const SCORING_STARTED_LOCKED = "Scoring has started, so this can no longe
 export const RESULT_TYPES = ["win", "tie", "no_result"] as const
 export const RESULT_TYPE_MAX_LENGTH = 10
 export const RESULT_SUMMARY_MAX_LENGTH = 200
+
+// A match has two regular innings; a tie after them is settled by a Super Over (innings 3 and 4)
+export const REGULAR_INNINGS = 2
+export const MAX_INNINGS = 4
+export const SUPER_OVER_OVERS = 1
+// Two wickets end a Super Over innings
+export const SUPER_OVER_WICKETS = 2
+// How a win was decided when it was not decided by the regular innings
+export const DECIDED_BY = ["super_over", "boundary_count"] as const
+export const DECIDED_BY_MAX_LENGTH = 20

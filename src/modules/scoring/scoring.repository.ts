@@ -14,12 +14,8 @@ export type NewDeliveryRecord = typeof deliveries.$inferInsert
 // Run several queries as one all-or-nothing unit
 export const inTransaction = <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work)
 
-// Serialise two requests that would both start an innings of the same match
-export const lockMatch = async (tx: Tx, matchId: number) => {
-    await tx.select({ id: matches.id }).from(matches).where(eq(matches.id, matchId)).limit(1).for("update")
-}
-
-// The match row locked until the transaction ends, with the moment it was decided (null while it can still change)
+// The match row locked until the transaction ends (two starts, or a start and a deciding ball, wait for each other),
+// with the moment it was decided (null while it can still change)
 export const lockMatchState = async (tx: Tx, matchId: number) => {
     const [row] = await tx
         .select({ completedAt: matches.completedAt })
@@ -124,7 +120,7 @@ export const markScoringStarted = async (tx: Tx, matchId: number) => {
 export const saveMatchResult = async (
     tx: Tx,
     matchId: number,
-    result: { resultType: string; winnerTeamId: number | null; resultSummary: string },
+    result: { resultType: string; winnerTeamId: number | null; resultSummary: string; decidedBy: string | null },
 ) => {
     await tx
         .update(matches)
@@ -133,6 +129,7 @@ export const saveMatchResult = async (
             resultType: result.resultType,
             winnerTeamId: result.winnerTeamId,
             resultSummary: result.resultSummary,
+            decidedBy: result.decidedBy,
         })
         .where(eq(matches.id, matchId))
 }

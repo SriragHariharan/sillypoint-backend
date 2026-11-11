@@ -1,7 +1,13 @@
 import { sql } from "drizzle-orm"
 import { check, index, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core"
 
-import { RESULT_SUMMARY_MAX_LENGTH, RESULT_TYPE_MAX_LENGTH, RESULT_TYPES } from "../../shared/constants/scoring.js"
+import {
+    DECIDED_BY,
+    DECIDED_BY_MAX_LENGTH,
+    RESULT_SUMMARY_MAX_LENGTH,
+    RESULT_TYPE_MAX_LENGTH,
+    RESULT_TYPES,
+} from "../../shared/constants/scoring.js"
 import {
     MATCH_STAGES,
     MAX_OVERS_PER_SIDE,
@@ -56,6 +62,8 @@ export const matches = pgTable(
         resultType: varchar("result_type", { length: RESULT_TYPE_MAX_LENGTH }),
         winnerTeamId: integer("winner_team_id").references(() => teams.id, { onDelete: "restrict" }),
         resultSummary: varchar("result_summary", { length: RESULT_SUMMARY_MAX_LENGTH }),
+        // Set when a win came from the Super Over or, after a tied Super Over, from the boundary count
+        decidedBy: varchar("decided_by", { length: DECIDED_BY_MAX_LENGTH }),
         createdBy: integer("created_by")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
@@ -82,6 +90,10 @@ export const matches = pgTable(
         check(
             "matches_result_valid",
             sql`(${table.completedAt} is null and ${table.resultType} is null and ${table.winnerTeamId} is null and ${table.resultSummary} is null) or (${table.completedAt} is not null and ${table.scoringStartedAt} is not null and ${table.resultSummary} is not null and ${table.resultType} in (${sql.join(RESULT_TYPES.map((type) => sql.raw(`'${type}'`)), sql`, `)}) and ((${table.resultType} = 'win' and ${table.winnerTeamId} in (${table.teamAId}, ${table.teamBId})) or (${table.resultType} <> 'win' and ${table.winnerTeamId} is null)))`,
+        ),
+        check(
+            "matches_decided_by_valid",
+            sql`${table.decidedBy} is null or (${table.resultType} = 'win' and ${table.decidedBy} in (${sql.join(DECIDED_BY.map((value) => sql.raw(`'${value}'`)), sql`, `)}))`,
         ),
         check("matches_stage_valid", sql`${table.stage} is null or ${table.stage} in (${sql.join(MATCH_STAGES.map((stage) => sql.raw(`'${stage}'`)), sql`, `)})`),
     ],

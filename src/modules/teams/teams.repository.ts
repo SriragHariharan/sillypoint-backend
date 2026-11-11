@@ -1,7 +1,8 @@
-import { and, count, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { db } from "../../db/postgres.js"
 import { innings, matches, teams, tournaments } from "../../db/schema/index.js"
+import { REGULAR_INNINGS } from "../../shared/constants/scoring.js"
 import { type Tx } from "../users/users.repository.js"
 import { type TeamMatchesQuery } from "./teams.schema.js"
 
@@ -133,8 +134,14 @@ export const listTeamMatches = async (teamId: number, query: TeamMatchesQuery) =
             .innerJoin(tournaments, eq(tournaments.id, matches.tournamentId))
             .innerJoin(teamA, eq(teamA.id, matches.teamAId))
             .innerJoin(teamB, eq(teamB.id, matches.teamBId))
-            .leftJoin(inningsA, and(eq(inningsA.matchId, matches.id), eq(inningsA.battingTeamId, matches.teamAId)))
-            .leftJoin(inningsB, and(eq(inningsB.matchId, matches.id), eq(inningsB.battingTeamId, matches.teamBId)))
+            .leftJoin(
+                inningsA,
+                and(eq(inningsA.matchId, matches.id), eq(inningsA.battingTeamId, matches.teamAId), lte(inningsA.inningsNumber, REGULAR_INNINGS)),
+            )
+            .leftJoin(
+                inningsB,
+                and(eq(inningsB.matchId, matches.id), eq(inningsB.battingTeamId, matches.teamBId), lte(inningsB.inningsNumber, REGULAR_INNINGS)),
+            )
             .where(where)
             .orderBy(desc(matches.scheduledAt), desc(matches.id))
             .limit(query.limit)

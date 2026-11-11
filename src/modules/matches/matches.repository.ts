@@ -28,6 +28,8 @@ const matchColumns = {
     resultType: matches.resultType,
     winnerTeamId: matches.winnerTeamId,
     resultSummary: matches.resultSummary,
+    // super_over / boundary_count when the regular innings did not decide the win
+    decidedBy: matches.decidedBy,
     createdAt: matches.createdAt,
     teamA: { id: teamA.id, name: teamA.name, logo: teamA.logoUrl },
     teamB: { id: teamB.id, name: teamB.name, logo: teamB.logoUrl },

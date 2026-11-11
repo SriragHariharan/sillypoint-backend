@@ -1,5 +1,5 @@
-import { BALLS_PER_OVER, FOUR_RUNS, SIX_RUNS } from "../../shared/constants/scoring.js"
-import { bowlerRunsOf, isBowlerWicket, isTeamWicket, oversText, round, totalRunsOf } from "./delivery-math.js"
+import { BALLS_PER_OVER } from "../../shared/constants/scoring.js"
+import { batBoundaryOf, bowlerRunsOf, isBowlerWicket, isTeamWicket, oversText, round, totalRunsOf } from "./delivery-math.js"
 import { ballLabel, dismissalText } from "./labels.js"
 import { type DeliveryRow, type PlayerInfo } from "./types.js"
 
@@ -111,10 +111,9 @@ export const buildInningsCard = (rows: readonly DeliveryRow[], input: CardInput)
             if (striker) {
                 striker.runs += row.runsOffBat
                 if (row.wides === 0) striker.balls += 1
-                if (row.isBoundary && row.overthrowRuns === 0) {
-                    if (row.runsOffBat === FOUR_RUNS) striker.fours += 1
-                    if (row.runsOffBat === SIX_RUNS) striker.sixes += 1
-                }
+                const boundary = batBoundaryOf(row)
+                if (boundary === "four") striker.fours += 1
+                if (boundary === "six") striker.sixes += 1
             }
 
             let bowler = bowlers.get(row.bowlerId)

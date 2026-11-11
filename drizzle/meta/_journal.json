@@ -204,6 +204,13 @@
       "when": 1794400579113,
       "tag": "0028_tearful_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794418431666,
+      "tag": "0029_stiff_klaw",
+      "breakpoints": true
     }
   ]
 }

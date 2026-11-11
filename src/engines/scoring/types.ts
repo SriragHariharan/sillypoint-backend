@@ -1,5 +1,6 @@
 import {
     type BALL_WICKET_TYPES,
+    type DECIDED_BY,
     type DELIVERY_KINDS,
     type EXTRA_TYPES,
     type INNINGS_END_REASONS,
@@ -17,6 +18,7 @@ export type WicketType = (typeof WICKET_TYPES)[number]
 export type DeliveryKind = (typeof DELIVERY_KINDS)[number]
 export type InningsStatus = (typeof INNINGS_STATUSES)[number]
 export type InningsEndReason = (typeof INNINGS_END_REASONS)[number]
+export type DecidedBy = (typeof DECIDED_BY)[number]
 
 export type RuleResult<T> = { ok: true; value: T } | { ok: false; message: string }
 

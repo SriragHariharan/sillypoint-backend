@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
     BALL_WICKET_TYPES,
     EXTRA_TYPES,
+    MAX_INNINGS,
     MAX_RUNS_PER_BALL,
     NO_BALL_RUN_KINDS,
     RETIREMENT_TYPES,
@@ -23,7 +24,7 @@ const runs = (label: string) =>
         .max(MAX_RUNS_PER_BALL, `${label} cannot be more than ${MAX_RUNS_PER_BALL}`)
 
 export const inningsParamsSchema = z.object({
-    n: z.coerce.number({ error: "Innings is invalid" }).int("Innings is invalid").min(1, "Innings is invalid").max(2, "Innings is invalid"),
+    n: z.coerce.number({ error: "Innings is invalid" }).int("Innings is invalid").min(1, "Innings is invalid").max(MAX_INNINGS, "Innings is invalid"),
 })
 
 export const startInningsSchema = z

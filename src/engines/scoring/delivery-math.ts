@@ -1,4 +1,4 @@
-import { BOWLER_WICKET_TYPES } from "../../shared/constants/scoring.js"
+import { BOWLER_WICKET_TYPES, FOUR_RUNS, SIX_RUNS } from "../../shared/constants/scoring.js"
 import { type DeliveryRow, type WicketType } from "./types.js"
 
 type Row = Pick<DeliveryRow, "runsOffBat" | "wides" | "noBalls" | "byes" | "legByes">
@@ -12,6 +12,14 @@ export const totalRunsOf = (row: Row) => row.runsOffBat + row.wides + row.noBall
 
 // Runs charged to the bowler: byes and leg byes are not
 export const bowlerRunsOf = (row: Row) => row.runsOffBat + row.wides + row.noBalls
+
+// A four or a six hit by the batter (a boundary overthrow or boundary byes are not the batter's)
+export const batBoundaryOf = (row: Pick<DeliveryRow, "isBoundary" | "overthrowRuns" | "runsOffBat">): "four" | "six" | null => {
+    if (!row.isBoundary || row.overthrowRuns !== 0) return null
+    if (row.runsOffBat === FOUR_RUNS) return "four"
+    if (row.runsOffBat === SIX_RUNS) return "six"
+    return null
+}
 
 // A wicket that counts against the team (a batter who retires hurt is not out)
 export const isTeamWicket = (wicketType: WicketType | null) => wicketType !== null && wicketType !== "retired_hurt"

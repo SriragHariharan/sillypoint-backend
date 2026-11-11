@@ -21,6 +21,13 @@ import { NOTHING_TO_UNDO } from "../../engines/scoring/messages.js"
 import { computeResult } from "../../engines/scoring/result.js"
 import { buildInningsCard } from "../../engines/scoring/scorecard.js"
 import {
+    computeSuperOverResult,
+    countBoundaries,
+    goesToSuperOver,
+    isSuperOverInnings,
+    superOverRules,
+} from "../../engines/scoring/super-over.js"
+import {
     type BallInput,
     type DeliveryKind,
     type DeliveryRow,
@@ -35,15 +42,15 @@ import {
     type RuleResult,
     type WicketType,
 } from "../../engines/scoring/types.js"
-import { BALLS_PER_OVER } from "../../shared/constants/scoring.js"
+import { BALLS_PER_OVER, MAX_INNINGS, REGULAR_INNINGS } from "../../shared/constants/scoring.js"
 import { BadRequestError, ConflictError, NotFoundError } from "../../shared/http/errors.js"
 import { assertScoringOpen, getMatch } from "../matches/matches.service.js"
 import { todayInTimezone } from "../../shared/utils/date.js"
 import { getMatchPlayers } from "../squads/squads.service.js"
 import { TOURNAMENT_TIMEZONE } from "../tournaments/tournaments.constants.js"
 import {
-    BOTH_INNINGS_STARTED,
-    FIRST_INNINGS_NOT_OVER,
+    ALL_INNINGS_STARTED,
+    INNINGS_NOT_OVER,
     INNINGS_NOT_FOUND,
     MATCH_ALREADY_COMPLETED,
     MATCH_NOT_READY,
@@ -64,10 +71,10 @@ import {
     findScorecardFingerprint,
     type InningsRow,
     inTransaction,
+    type Tx,
     insertDelivery,
     insertInnings,
     lockInnings,
-    lockMatch,
     lockMatchState,
     markScoringStarted,
     saveMatchResult,
@@ -103,9 +110,11 @@ const namesOf = (players: readonly Player[]) => new Map(players.map((player) => 
 
 const teamOf = (match: Match, teamId: number) => (match.teamA.id === teamId ? match.teamA : match.teamB)
 
-// The rules that depend on the match; the overs are always set once an innings exists (they are locked then)
-const rulesOf = (match: Match): MatchRules => {
+// The rules of one innings: the match's overs and players, or the Super Over's one over and two wickets.
+// The overs are always set once an innings exists (they are locked then).
+const rulesOf = (match: Match, inningsNumber: number): MatchRules => {
     if (match.oversPerSide === null) throw new BadRequestError(MATCH_NOT_READY)
+    if (isSuperOverInnings(inningsNumber)) return superOverRules()
     return { oversPerSide: match.oversPerSide, playersPerSide: match.tournament.playersPerSide }
 }
 
@@ -144,8 +153,11 @@ const snapshotOf = (row: InningsRow): InningsSnapshot => ({
     target: row.target,
 })
 
-const inningsSummary = (row: InningsRow) => ({
+const inningsSummary = (match: Match, row: InningsRow) => ({
     number: row.inningsNumber,
+    isSuperOver: isSuperOverInnings(row.inningsNumber),
+    // Overs this innings can last
+    oversLimit: rulesOf(match, row.inningsNumber).oversPerSide,
     battingTeamId: row.battingTeamId,
     bowlingTeamId: row.bowlingTeamId,
     status: row.status as InningsStatus,
@@ -175,19 +187,23 @@ const buildState = async (match: Match) => {
             battingPlayers: playingXi(players, latest.battingTeamId),
             bowlingPlayers: playingXi(players, latest.bowlingTeamId),
             names: namesOf(players),
-            rules: rulesOf(match),
+            rules: rulesOf(match, latest.inningsNumber),
         })
         // A finished match is final: nothing can be taken back any more
-        current = { ...inningsSummary(latest), ...view, canUndo: view.canUndo && !match.completedAt }
+        current = { ...inningsSummary(match, latest), ...view, canUndo: view.canUndo && !match.completedAt }
     }
 
-    const first = list[0]
-    const nextInnings = list.length === 0 ? 1 : list.length === 1 && first?.status === "completed" ? 2 : null
+    // The next innings once the latest is over and the match is still open (after a tie that is the Super Over)
+    const nextInnings = !latest
+        ? 1
+        : !match.completedAt && latest.status === "completed" && list.length < MAX_INNINGS
+          ? list.length + 1
+          : null
 
     return {
         match,
         players,
-        innings: list.map(inningsSummary),
+        innings: list.map((row) => inningsSummary(match, row)),
         current,
         // The innings the scorer can start next (null while one is in progress or after the second)
         nextInnings,
@@ -217,7 +233,8 @@ export const getScorecard = async (matchId: number) => {
             })
 
             // The chasing side's target while it is still batting
-            const ballsRemaining = Math.max((match.oversPerSide ?? 0) * BALLS_PER_OVER - card.total.legalBalls, 0)
+            const oversLimit = isSuperOverInnings(row.inningsNumber) ? superOverRules().oversPerSide : (match.oversPerSide ?? 0)
+            const ballsRemaining = Math.max(oversLimit * BALLS_PER_OVER - card.total.legalBalls, 0)
             const requiredRuns = row.target === null ? null : Math.max(row.target - card.total.runs, 0)
             const chase =
                 row.target === null || row.status === "completed"
@@ -234,6 +251,7 @@ export const getScorecard = async (matchId: number) => {
 
             return {
                 number: row.inningsNumber,
+                isSuperOver: isSuperOverInnings(row.inningsNumber),
                 battingTeam: teamOf(match, row.battingTeamId),
                 bowlingTeam: teamOf(match, row.bowlingTeamId),
                 status: row.status as InningsStatus,
@@ -278,7 +296,21 @@ const otherTeamId = (match: Match, teamId: number) => (match.teamA.id === teamId
 const firstBattingTeamId = (match: Match, tossWinnerTeamId: number) =>
     match.tossDecision === "bat" ? tossWinnerTeamId : otherTeamId(match, tossWinnerTeamId)
 
-// Start the first innings (or the second, once the first is over) with the opening batters and bowler
+// Who bats in an innings that is about to start, and the runs it needs. The second innings and the second Super
+// Over innings chase; the Super Over is opened by the side that batted second.
+const nextSides = (match: Match, tossWinnerTeamId: number, previous: InningsRow | undefined) => {
+    if (!previous) {
+        const battingTeamId = firstBattingTeamId(match, tossWinnerTeamId)
+        return { battingTeamId, bowlingTeamId: otherTeamId(match, battingTeamId), target: null }
+    }
+    if (previous.inningsNumber === REGULAR_INNINGS) {
+        return { battingTeamId: previous.battingTeamId, bowlingTeamId: previous.bowlingTeamId, target: null }
+    }
+    return { battingTeamId: previous.bowlingTeamId, bowlingTeamId: previous.battingTeamId, target: previous.runs + 1 }
+}
+
+// Start the next innings (the first, the second once the first is over, or a Super Over innings after a tie)
+// with the opening batters and bowler
 export const startInnings = async (matchId: number, input: StartInningsInput) => {
     const match = await assertScoringOpen(matchId)
     if (match.completedAt) throw new ConflictError(MATCH_ALREADY_COMPLETED)
@@ -289,15 +321,15 @@ export const startInnings = async (matchId: number, input: StartInningsInput) =>
     if (tossWinnerTeamId === null) throw new BadRequestError(MATCH_NOT_READY)
 
     await inTransaction(async (tx) => {
-        await lockMatch(tx, matchId)
+        // Under the match row lock, so a start cannot race the ball that decides the match
+        if ((await lockMatchState(tx, matchId))?.completedAt) throw new ConflictError(MATCH_ALREADY_COMPLETED)
         const existing = await findInningsOfMatch(tx, matchId)
-        const first = existing[0]
+        const previous = existing[existing.length - 1]
 
-        if (existing.length >= 2) throw new ConflictError(BOTH_INNINGS_STARTED)
-        if (first && first.status !== "completed") throw new ConflictError(FIRST_INNINGS_NOT_OVER)
+        if (existing.length >= MAX_INNINGS) throw new ConflictError(ALL_INNINGS_STARTED)
+        if (previous && previous.status !== "completed") throw new ConflictError(INNINGS_NOT_OVER)
 
-        const battingTeamId = first ? first.bowlingTeamId : firstBattingTeamId(match, tossWinnerTeamId)
-        const bowlingTeamId = first ? first.battingTeamId : otherTeamId(match, battingTeamId)
+        const { battingTeamId, bowlingTeamId, target } = nextSides(match, tossWinnerTeamId, previous)
 
         const batters = new Set(playingXi(players, battingTeamId).map((player) => player.id))
         if (!batters.has(input.strikerId) || !batters.has(input.nonStrikerId)) {
@@ -309,10 +341,10 @@ export const startInnings = async (matchId: number, input: StartInningsInput) =>
 
         await insertInnings(tx, {
             matchId,
-            inningsNumber: first ? 2 : 1,
+            inningsNumber: existing.length + 1,
             battingTeamId,
             bowlingTeamId,
-            target: first ? first.runs + 1 : null,
+            target,
             strikerId: input.strikerId,
             nonStrikerId: input.nonStrikerId,
             bowlerId: input.bowlerId,
@@ -348,12 +380,51 @@ type Step = (input: StepInput) => RuleResult<StepOutput>
 const asStep = <T>(result: RuleResult<T>, toOutput: (value: T) => StepOutput): RuleResult<StepOutput> =>
     result.ok ? ok(toOutput(result.value)) : result
 
+const sideOf = (match: Match, row: Pick<InningsRow, "battingTeamId" | "runs">) => ({
+    teamId: row.battingTeamId,
+    name: teamOf(match, row.battingTeamId).name,
+    runs: row.runs,
+})
+
+// The result once an innings that can decide the match is over, or null while the match goes on
+const decideMatch = async (
+    tx: Tx,
+    match: Match,
+    allInnings: readonly InningsRow[],
+    finished: InningsRow,
+    endReason: InningsEndReason | null,
+) => {
+    const before = allInnings.find((innings) => innings.inningsNumber === finished.inningsNumber - 1)
+    if (!before) return null
+
+    if (finished.inningsNumber === REGULAR_INNINGS) {
+        const result = computeResult({
+            first: sideOf(match, before),
+            second: { ...sideOf(match, finished), wickets: finished.wickets },
+            playersPerSide: match.tournament.playersPerSide,
+        })
+        return goesToSuperOver(result, endReason) ? null : result
+    }
+
+    if (finished.inningsNumber === MAX_INNINGS) {
+        // The boundaries of the whole match, the ball that just ended the Super Over included
+        const battingTeamOf = new Map(allInnings.map((innings) => [innings.id, innings.battingTeamId]))
+        const records = await findLiveDeliveriesOfMatch(tx, match.id)
+        const boundaries = countBoundaries(
+            records.map((record) => ({ ...record, battingTeamId: battingTeamOf.get(record.inningsId) ?? 0 })),
+        )
+        return computeSuperOverResult({ first: sideOf(match, before), second: sideOf(match, finished), boundaries })
+    }
+
+    return null
+}
+
 // Runs one change of an innings as a single transaction: the innings row is locked, the screen's version must be
 // the current one (a repeated or stale tap is rejected), the cricket rules are applied by the engine, the delivery
 // is stored and the snapshot on the innings row is updated together with it.
 const changeInnings = async (matchId: number, inningsNumber: number, expectedVersion: number, step: Step) => {
     const match = await assertScoringOpen(matchId)
-    const rules = rulesOf(match)
+    const rules = rulesOf(match, inningsNumber)
     const players = await getMatchPlayers(matchId)
 
     await inTransaction(async (tx) => {
@@ -397,26 +468,17 @@ const changeInnings = async (matchId: number, inningsNumber: number, expectedVer
             version: row.version + 1,
         })
 
-        // The second innings decides the match and the result is final (nothing can be changed or undone afterwards)
-        if (inningsNumber === 2) {
-            const first = allInnings.find((innings) => innings.inningsNumber === 1)
-            if (finished && first) {
-                const result = computeResult({
-                    first: { teamId: first.battingTeamId, name: teamOf(match, first.battingTeamId).name, runs: first.runs },
-                    second: {
-                        teamId: row.battingTeamId,
-                        name: teamOf(match, row.battingTeamId).name,
-                        runs: next.runs,
-                        wickets: next.wickets,
-                    },
-                    playersPerSide: rules.playersPerSide,
-                })
-                await saveMatchResult(tx, matchId, {
-                    resultType: result.resultType,
-                    winnerTeamId: result.winnerTeamId,
-                    resultSummary: result.summary,
-                })
-            }
+        // The second innings decides the match unless it is a tie, which goes to a Super Over; the second Super
+        // Over innings always decides it. The result is final (nothing can be changed or undone afterwards).
+        if (!finished) return
+        const decided = await decideMatch(tx, match, allInnings, { ...row, runs: next.runs, wickets: next.wickets }, next.endReason)
+        if (decided) {
+            await saveMatchResult(tx, matchId, {
+                resultType: decided.resultType,
+                winnerTeamId: decided.winnerTeamId,
+                resultSummary: decided.summary,
+                decidedBy: decided.decidedBy,
+            })
         }
     })
 
@@ -489,8 +551,8 @@ export const undoLast = (matchId: number, inningsNumber: number, expectedVersion
         const last = rows[rows.length - 1]
         const record = records[records.length - 1]
         if (!last || !record) return fail(NOTHING_TO_UNDO)
-        // Once the second innings has started the first one is settled
-        if (row.inningsNumber === 1 && allInnings.length > 1) return fail(NEXT_INNINGS_STARTED)
+        // Once the next innings has started this one is settled
+        if (row.inningsNumber < allInnings.length) return fail(NEXT_INNINGS_STARTED)
         return ok({ snapshot: undoDelivery(snapshot, last), voidId: record.id })
     })
 

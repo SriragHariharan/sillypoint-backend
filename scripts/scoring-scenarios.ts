@@ -21,6 +21,13 @@ import { ballLabel } from "../src/engines/scoring/labels.js"
 import { buildLiveView } from "../src/engines/scoring/live-view.js"
 import { computeResult } from "../src/engines/scoring/result.js"
 import { runsRunOf } from "../src/engines/scoring/rotation.js"
+import {
+    computeSuperOverResult,
+    countBoundaries,
+    goesToSuperOver,
+    isSuperOverInnings,
+    superOverRules,
+} from "../src/engines/scoring/super-over.js"
 import { buildInningsCard } from "../src/engines/scoring/scorecard.js"
 import {
     type BallInput,
@@ -582,6 +589,7 @@ check("match result", () => {
         resultType: "win",
         winnerTeamId: 2,
         summary: "Blues won by 6 wickets",
+        decidedBy: null,
     })
     assert.equal(computeResult({ first, second: { teamId: 2, name: "Blues", runs: 101, wickets: 9 }, playersPerSide: 11 }).summary, "Blues won by 1 wicket")
     assert.equal(computeResult({ first, second: { teamId: 2, name: "Blues", runs: 88, wickets: 10 }, playersPerSide: 11 }).summary, "Reds won by 12 runs")
@@ -590,6 +598,89 @@ check("match result", () => {
         resultType: "tie",
         winnerTeamId: null,
         summary: "Match tied",
+        decidedBy: null,
+    })
+})
+
+check("super over: innings 3 and 4, one over, the second wicket ends it", () => {
+    assert.deepEqual([1, 2, 3, 4, 5].map(isSuperOverInnings), [false, false, true, true, false])
+
+    const allOut = new Innings(start(), superOverRules())
+    allOut.ball({ runs: 4, isBoundary: true }).ball({ wicket: { type: "bowled", dismissedPlayerId: null, fielderId: null } })
+    assert.equal(allOut.snapshot.status, "in_progress", "one wicket does not end a Super Over")
+    allOut.pickBatter(3).ball({ wicket: { type: "bowled", dismissedPlayerId: null, fielderId: null } })
+    assert.equal(allOut.snapshot.status, "completed")
+    assert.equal(allOut.snapshot.endReason, "all_out")
+    assert.equal(allOut.snapshot.runs, 4)
+
+    const overDone = new Innings(start(), superOverRules())
+    overDone.ball({ extra: { type: "wide", runKind: "bat" } })
+    for (let index = 0; index < 5; index += 1) overDone.ball({ runs: 1 })
+    assert.equal(overDone.snapshot.status, "in_progress", "a wide is not one of the six balls")
+    overDone.ball({ runs: 6, isBoundary: true })
+    assert.equal(overDone.snapshot.endReason, "overs_complete")
+    assert.equal(overDone.snapshot.runs, 12)
+
+    const chase = new Innings(start({ target: 9 }), superOverRules())
+    chase.ball({ runs: 6, isBoundary: true }).ball({ runs: 2 })
+    assert.equal(chase.snapshot.status, "in_progress")
+    chase.ball({ runs: 1 })
+    assert.equal(chase.snapshot.endReason, "target_reached")
+})
+
+check("super over: a tie goes to it unless the scorer ended the match", () => {
+    const tie = computeResult({
+        first: { teamId: 1, name: "Reds", runs: 100 },
+        second: { teamId: 2, name: "Blues", runs: 100, wickets: 3 },
+        playersPerSide: 11,
+    })
+    const win = computeResult({
+        first: { teamId: 1, name: "Reds", runs: 100 },
+        second: { teamId: 2, name: "Blues", runs: 90, wickets: 10 },
+        playersPerSide: 11,
+    })
+    assert.equal(goesToSuperOver(tie, "overs_complete"), true)
+    assert.equal(goesToSuperOver(tie, "all_out"), true)
+    assert.equal(goesToSuperOver(tie, "ended_by_scorer"), false)
+    assert.equal(goesToSuperOver(win, "all_out"), false)
+})
+
+check("super over: boundaries count fours and sixes off the bat only", () => {
+    const innings = new Innings(start({ legalBalls: 0 }), { oversPerSide: 5, playersPerSide: 11 })
+    innings
+        .ball({ runs: 4, isBoundary: true })
+        .ball({ runs: 6, isBoundary: true })
+        .ball({ runs: 4, isBoundary: true, extra: { type: "bye", runKind: "bat" } })
+        .ball({ runs: 5, isBoundary: true, overthrowRuns: 4 })
+        .ball({ runs: 4, isBoundary: true, extra: { type: "no_ball", runKind: "bat" } })
+    const rows = innings.rows.map((row) => ({ ...row, battingTeamId: 7 }))
+    assert.equal(countBoundaries(rows).get(7), 3, "a four, a six and a four off a no-ball; not boundary byes or an overthrow four")
+})
+
+check("super over result: runs first, then the boundary count, else a tie", () => {
+    const reds = { teamId: 1, name: "Reds", runs: 10 }
+    const blues = { teamId: 2, name: "Blues", runs: 10 }
+    const counts = (redsCount: number, bluesCount: number) => new Map([[1, redsCount], [2, bluesCount]])
+
+    assert.deepEqual(computeSuperOverResult({ first: reds, second: { ...blues, runs: 11 }, boundaries: counts(9, 2) }), {
+        resultType: "win",
+        winnerTeamId: 2,
+        summary: "Blues won the Super Over",
+        decidedBy: "super_over",
+    })
+    assert.equal(computeSuperOverResult({ first: reds, second: { ...blues, runs: 7 }, boundaries: counts(0, 9) }).winnerTeamId, 1)
+    assert.deepEqual(computeSuperOverResult({ first: reds, second: blues, boundaries: counts(14, 11) }), {
+        resultType: "win",
+        winnerTeamId: 1,
+        summary: "Reds won on boundary count (14 v 11)",
+        decidedBy: "boundary_count",
+    })
+    assert.equal(computeSuperOverResult({ first: reds, second: blues, boundaries: counts(3, 5) }).summary, "Blues won on boundary count (5 v 3)")
+    assert.deepEqual(computeSuperOverResult({ first: reds, second: blues, boundaries: counts(6, 6) }), {
+        resultType: "tie",
+        winnerTeamId: null,
+        summary: "Match tied (Super Over and boundary count level)",
+        decidedBy: null,
     })
 })
 

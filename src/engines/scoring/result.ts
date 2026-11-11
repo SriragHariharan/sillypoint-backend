@@ -1,12 +1,16 @@
-type Side = { teamId: number; name: string; runs: number }
+import { type DecidedBy } from "./types.js"
+
+export type Side = { teamId: number; name: string; runs: number }
 
 export type MatchResult = {
     resultType: "win" | "tie"
     winnerTeamId: number | null
     summary: string
+    // Null when the regular innings decided it
+    decidedBy: DecidedBy | null
 }
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`
+export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`
 
 // Who won once both innings are over. The side batting second wins by the wickets it had left,
 // the side batting first by the runs it was ahead; level scores are a tie.
@@ -23,14 +27,16 @@ export const computeResult = (input: {
             resultType: "win",
             winnerTeamId: second.teamId,
             summary: `${second.name} won by ${plural(wicketsLeft, "wicket")}`,
+            decidedBy: null,
         }
     }
 
-    if (second.runs === first.runs) return { resultType: "tie", winnerTeamId: null, summary: "Match tied" }
+    if (second.runs === first.runs) return { resultType: "tie", winnerTeamId: null, summary: "Match tied", decidedBy: null }
 
     return {
         resultType: "win",
         winnerTeamId: first.teamId,
         summary: `${first.name} won by ${plural(first.runs - second.runs, "run")}`,
+        decidedBy: null,
     }
 }
