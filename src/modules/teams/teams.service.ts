@@ -29,8 +29,8 @@ export const createTeam = async (managerId: number, input: CreateTeamInput, logo
             name: input.name,
             logoUrl: logo?.url ?? null,
             logoPublicId: logo?.publicId ?? null,
-            captainName: input.captain_name,
-            captainMobile: input.captain_mobile,
+            managerName: input.manager_name,
+            managerMobile: input.manager_mobile,
             managerId,
         })
         if (!row) throw new Error("Failed to create team")
@@ -75,8 +75,8 @@ export const updateMyTeam = async (managerId: number, id: number, input: UpdateT
 
             const team = await updateTeam(tx, id, managerId, {
                 name: input.name,
-                captainName: input.captain_name,
-                captainMobile: input.captain_mobile,
+                managerName: input.manager_name,
+                managerMobile: input.manager_mobile,
                 ...(logo ? { logoUrl: logo.url, logoPublicId: logo.publicId } : {}),
             })
             if (!team) throw new NotFoundError(TEAM_NOT_FOUND)

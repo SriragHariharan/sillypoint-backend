@@ -11,8 +11,8 @@ export const teams = pgTable(
         logoUrl: text("logo_url"),
         // Cloudinary id of the logo, kept so the image can be deleted later
         logoPublicId: text("logo_public_id"),
-        captainName: varchar("captain_name", { length: 60 }).notNull(),
-        captainMobile: varchar("captain_mobile", { length: 10 }).notNull(),
+        managerName: varchar("manager_name", { length: 60 }).notNull(),
+        managerMobile: varchar("manager_mobile", { length: 10 }).notNull(),
         // The user who manages the team. Restrict: deleting a user never deletes teams.
         managerId: integer("manager_id")
             .notNull()
@@ -26,7 +26,7 @@ export const teams = pgTable(
     (table) => [
         index("teams_manager_id_idx").on(table.managerId),
         check("teams_name_not_blank", sql`length(btrim(${table.name})) > 0`),
-        check("teams_captain_name_not_blank", sql`length(btrim(${table.captainName})) > 0`),
-        check("teams_captain_mobile_10_digits", sql`${table.captainMobile} ~ '^[0-9]{10}$'`),
+        check("teams_manager_name_not_blank", sql`length(btrim(${table.managerName})) > 0`),
+        check("teams_manager_mobile_10_digits", sql`${table.managerMobile} ~ '^[0-9]{10}$'`),
     ],
 )

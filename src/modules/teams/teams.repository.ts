@@ -10,8 +10,8 @@ const teamColumns = {
     id: teams.id,
     name: teams.name,
     logo: teams.logoUrl,
-    captain_name: teams.captainName,
-    captain_mobile: teams.captainMobile,
+    manager_name: teams.managerName,
+    manager_mobile: teams.managerMobile,
     manager_id: teams.managerId,
     created_at: teams.createdAt,
     updated_at: teams.updatedAt,
@@ -22,8 +22,8 @@ export const insertTeam = async (values: {
     name: string
     logoUrl: string | null
     logoPublicId: string | null
-    captainName: string
-    captainMobile: string
+    managerName: string
+    managerMobile: string
     managerId: number
 }) => {
     const [row] = await db.insert(teams).values(values).returning(teamColumns)
@@ -71,8 +71,8 @@ export const updateTeam = async (
     managerId: number,
     values: {
         name?: string
-        captainName?: string
-        captainMobile?: string
+        managerName?: string
+        managerMobile?: string
         logoUrl?: string
         logoPublicId?: string
     },

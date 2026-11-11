@@ -1,6 +1,6 @@
 export const NAME_MIN_LENGTH = 2
 export const NAME_MAX_LENGTH = 60
-export const CAPTAIN_NAME_MAX_LENGTH = 60
+export const MANAGER_NAME_MAX_LENGTH = 60
 
 // Indian mobile number: 10 digits starting with 6-9
 export const MOBILE_REGEX = /^[6-9]\d{9}$/

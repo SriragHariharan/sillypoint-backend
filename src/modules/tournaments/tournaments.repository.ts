@@ -151,12 +151,12 @@ export const listTournaments = async (query: ListTournamentsQuery, today: string
     return { rows, total: totals[0]?.total ?? 0 }
 }
 
-// Team columns sent to the client for an enrolled team (no captain mobile: the list is public)
+// Team columns sent to the client for an enrolled team (no manager mobile: the list is public)
 const enrolledTeamColumns = {
     id: teams.id,
     name: teams.name,
     logo: teams.logoUrl,
-    captain_name: teams.captainName,
+    manager_name: teams.managerName,
     added_by: tournamentTeams.addedBy,
     created_at: tournamentTeams.createdAt,
 }
