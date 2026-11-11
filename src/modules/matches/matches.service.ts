@@ -14,6 +14,7 @@ import { NOT_ORGANIZER } from "../tournaments/tournaments.constants.js"
 import {
     DATE_OUTSIDE_TOURNAMENT,
     MATCH_ALREADY_STARTED,
+    MATCH_COMPLETED_CANNOT_RESCHEDULE,
     MATCH_IN_PAST,
     MATCH_NOT_FOUND,
     MATCH_TIMEZONE_OFFSET,
@@ -132,7 +133,9 @@ export const rescheduleMatch = async (userId: number, id: number, input: Resched
     if (tournament.status === "cancelled" || tournament.status === "completed") {
         throw new ConflictError(TOURNAMENT_NOT_OPEN_FOR_RESCHEDULE)
     }
-    if (match.scheduledAt.getTime() <= Date.now()) throw new ConflictError(MATCH_ALREADY_STARTED)
+    // A match with a result is final, whatever its date
+    if (match.completedAt) throw new ConflictError(MATCH_COMPLETED_CANNOT_RESCHEDULE)
+    if (match.scoringStartedAt || match.scheduledAt.getTime() <= Date.now()) throw new ConflictError(MATCH_ALREADY_STARTED)
     if (input.matchDate < tournament.startDate || input.matchDate > tournament.endDate) {
         throw new BadRequestError(DATE_OUTSIDE_TOURNAMENT)
     }
@@ -141,7 +144,12 @@ export const rescheduleMatch = async (userId: number, id: number, input: Resched
     if (scheduledAt.getTime() <= Date.now()) throw new BadRequestError(MATCH_IN_PAST)
 
     const updated = await updateMatchSchedule(id, scheduledAt)
-    if (!updated) throw new NotFoundError(MATCH_NOT_FOUND)
+    if (!updated) {
+        // Scoring started or the match concluded between the check and the update
+        const current = await findMatch(id)
+        if (!current) throw new NotFoundError(MATCH_NOT_FOUND)
+        throw new ConflictError(current.completedAt ? MATCH_COMPLETED_CANNOT_RESCHEDULE : MATCH_ALREADY_STARTED)
+    }
 
     return getMatch(id)
 }
