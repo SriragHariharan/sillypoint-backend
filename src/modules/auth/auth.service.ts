@@ -1,9 +1,18 @@
 import { randomInt } from "node:crypto"
 import argon2 from "argon2"
 import { db } from "../../db/postgres.js"
-import { BadRequestError, ForbiddenError, TooManyRequestsError, UnauthorizedError } from "../../shared/http/errors.js"
+import { env } from "../../shared/config/env.js"
+import {
+    BadRequestError,
+    ForbiddenError,
+    NotFoundError,
+    TooManyRequestsError,
+    UnauthorizedError,
+} from "../../shared/http/errors.js"
 import {
     ACCOUNT_BLOCKED,
+    DEMO_ACCOUNTS,
+    DEMO_LOGIN_DISABLED,
     OTP_BLOCK_MS,
     OTP_EXPIRED,
     OTP_INVALID,
@@ -13,7 +22,7 @@ import {
     RESEND_INVALID,
     TOO_MANY_ATTEMPTS,
 } from "./auth.constants.js"
-import { type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
+import { type DemoLoginInput, type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
 import {
     activateUser,
     deleteOtpById,
@@ -214,6 +223,33 @@ export const verifyOtp = async ({ userId, otp, purpose }: VerifyOtpInput) => {
     const session = await issueSession(result.user.id)
 
     return { user: result.user, isNewUser: purpose === "signup", session }
+}
+
+// Log a visitor into one of the shared demo accounts without an OTP. The account is created on first use.
+export const demoLogin = async ({ role }: DemoLoginInput) => {
+    if (!env.demoLoginEnabled) throw new NotFoundError(DEMO_LOGIN_DISABLED)
+
+    const mobile = DEMO_ACCOUNTS[role]
+    let user = await findUserByMobile(mobile)
+
+    if (!user) {
+        user = await db.transaction(async (tx) => {
+            const created = await insertUser(tx, mobile)
+            if (!created) throw new Error("Failed to create demo user")
+            await activateUser(tx, created.id)
+            return { ...created, status: "active" as const }
+        })
+    }
+
+    if (user.status === "blocked") throw new ForbiddenError(ACCOUNT_BLOCKED)
+    // A demo number that was left half-signed-up is verified now
+    if (user.status !== "active") {
+        const userId = user.id
+        await db.transaction((tx) => activateUser(tx, userId))
+    }
+
+    const session = await issueSession(user.id)
+    return { user: { id: user.id, mobile: user.mobile, avatar: user.avatarUrl }, session }
 }
 
 // Get the logged in user. A blocked or deleted user is treated as logged out.

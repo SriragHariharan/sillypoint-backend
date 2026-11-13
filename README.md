@@ -6,6 +6,7 @@ Frontend: [sillypoint-frontend](https://github.com/SriragHariharan/sillypoint-fr
 ## Features
 
 - **Passwordless auth**: mobile number + 4-digit OTP, short-lived access JWT and a rotating refresh-token cookie
+- **Demo accounts**: one-click organizer and team manager logins for visitors (no OTP)
 - **Tournaments**: create with logo, dates, registration deadline, fee, prize money and squad size, then search and filter
 - **Teams**: team managers create teams and enrol them before the registration deadline
 - **Matches**: organizers schedule fixtures by stage, and every match gets a private scorer link + 6-digit PIN
@@ -42,6 +43,7 @@ npm run dev               # http://localhost:3000 (health check: GET /test)
 | `REFRESH_TOKEN_SECRET` | Yes | Signs refresh tokens (32+ characters, different from the access secret) |
 | `CLIENT_ORIGIN` | Yes | Allowed CORS origin, e.g. `http://localhost:5173` |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | No | Only needed for image uploads |
+| `DEMO_LOGIN_ENABLED` | No | `true` turns on the demo-account logins |
 | `NODE_ENV` | No | `production` makes the refresh cookie `Secure` |
 
 ## API
@@ -54,6 +56,7 @@ Base URL `/api`. 🔓 public · 🔑 user access token (`Authorization: Bearer`)
 | --- | --- | --- | --- |
 | POST | `/auth/request-otp` | 🔓 | Send an OTP (signup or login is decided by the server) |
 | POST | `/auth/verify-otp` | 🔓 | Verify the OTP, returns the access token and sets the refresh cookie |
+| POST | `/auth/demo-login` | 🔓 | Log in to a demo account (`role`: `organizer` or `manager`) without an OTP |
 | POST | `/auth/resend-otp` | 🔓 | Send a new OTP |
 | POST | `/auth/refresh` · `/auth/logout` | cookie | Rotate the refresh token / end the session |
 | GET | `/auth/me` | 🔑 | Current user |
@@ -127,6 +130,6 @@ scripts/                Engine scenario checks
 
 ## Notes
 
-- OTPs are only logged to the console until SMS delivery (MSG91) is added.
+- OTPs are only logged to the console (no SMS provider). Visitors use the demo accounts instead.
 - There is no WebSocket yet. Clients poll the cached scorecard endpoint for live scores.
 - There is no test runner. The `check:*` scripts verify the engines with plain `node:assert`.

@@ -2,7 +2,7 @@ import { type Request, type Response } from "express"
 import { success } from "../../shared/http/response.js"
 import { REFRESH_COOKIE_NAME } from "./auth.constants.js"
 import { clearRefreshCookie, setRefreshCookie } from "./auth.cookies.js"
-import { type RequestOtpInput, type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
+import { type DemoLoginInput, type RequestOtpInput, type ResendOtpInput, type VerifyOtpInput } from "./auth.schema.js"
 import * as authService from "./auth.service.js"
 import * as sessionService from "./session.service.js"
 
@@ -27,6 +27,12 @@ export const requestOtp = async (req: Request, res: Response) => {
 export const verifyOtp = async (req: Request, res: Response) => {
     const { user, isNewUser, session } = await authService.verifyOtp(req.body as VerifyOtpInput)
     return sendSession(res, session, { message: "OTP verified", user, isNewUser })
+}
+
+// Handles a one-click demo login: same session as a verified OTP
+export const demoLogin = async (req: Request, res: Response) => {
+    const { user, session } = await authService.demoLogin(req.body as DemoLoginInput)
+    return sendSession(res, session, { message: "Logged in", user, isNewUser: false })
 }
 
 // Handles the resend OTP request

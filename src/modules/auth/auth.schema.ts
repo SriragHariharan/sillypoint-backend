@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { otpPurposeEnum } from "../../db/schema/index.js"
+import { DEMO_ROLES, INVALID_DEMO_ROLE } from "./auth.constants.js"
 
 // Request OTP body: mobile must be exactly 10 digits
 export const requestOtpSchema = z.object({
@@ -22,3 +23,10 @@ export const resendOtpSchema = z.object({
 export type RequestOtpInput = z.infer<typeof requestOtpSchema>
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>
+
+// Demo login body: which demo account to open
+export const demoLoginSchema = z.object({
+    role: z.enum(DEMO_ROLES, { error: INVALID_DEMO_ROLE }),
+})
+
+export type DemoLoginInput = z.infer<typeof demoLoginSchema>

@@ -27,6 +27,8 @@ export const env = {
     refreshTokenSecret,
     clientOrigin: required("CLIENT_ORIGIN"),
     isProduction: process.env.NODE_ENV === "production",
+    // One-click demo accounts on the login page (off unless set to "true")
+    demoLoginEnabled: process.env.DEMO_LOGIN_ENABLED === "true",
     // Optional at startup: only image uploads need them
     cloudinary: {
         cloudName: process.env.CLOUDINARY_CLOUD_NAME,

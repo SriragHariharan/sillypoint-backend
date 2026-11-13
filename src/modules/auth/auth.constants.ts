@@ -32,3 +32,12 @@ export const REFRESH_COOKIE_NAME = "refresh_token"
 export const REFRESH_COOKIE_PATH = "/api/auth"
 
 export const REFRESH_INVALID = "Invalid or expired session"
+
+// One-click demo accounts for visitors (no OTP), turned on with DEMO_LOGIN_ENABLED=true
+export const DEMO_ROLES = ["organizer", "manager"] as const
+export const DEMO_ACCOUNTS: Record<(typeof DEMO_ROLES)[number], string> = {
+    organizer: "9000000001",
+    manager: "9000000002",
+}
+export const DEMO_LOGIN_DISABLED = "Demo login is not available"
+export const INVALID_DEMO_ROLE = "Choose organizer or manager"
